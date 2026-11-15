@@ -1,0 +1,39 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log
+
+# Environment / secrets
+.env
+*.tmp
+*.log
+
+# Flutter build outputs
+inter_c/build/
+inter_c/.dart_tool/
+inter_c/.flutter-plugins
+inter_c/.flutter-plugins-dependencies
+inter_c/android/.gradle/
+inter_c/android/local.properties
+inter_c/ios/.symlinks/
+inter_c/ios/Pods/
+inter_c/ios/Flutter/Flutter.framework
+inter_c/ios/Flutter/Flutter.podspec
+inter_c/.idea/
+
+# Large ML model files
+**/*.pt
+**/*.weights
+**/*.onnx
+ocr_service/__pycache__/
+backend/ocr_service/__pycache__/
+
+# Backend nested git (keep files, ignore nested .git)
+backend/.git/
+**/.git_bak/
+
+# Misc
+Thumbs.db
+.DS_Store
+Digital weight scale detection 2.v1i.yolo26/
+lcd-digit-recognition/
