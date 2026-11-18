@@ -102,7 +102,8 @@ class _UsersBottomNav extends StatelessWidget {
         currentIndex: 5,
         onTap: (i) {
           const routes = ['/dashboard', '/karagars', '/jobs', '/treasury', '/reports', '/users'];
-          if (i < routes.length) context.go(routes[i]);
+          if (i == 5) return;
+          if (i < routes.length) context.push(routes[i]);
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.dashboard_outlined), activeIcon: Icon(Icons.dashboard_rounded), label: 'Dashboard'),

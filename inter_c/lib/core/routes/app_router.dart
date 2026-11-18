@@ -109,10 +109,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   );
 });
 
-// Root screens that should show exit confirmation instead of closing the app
-/// Wraps a root screen with Android back-button handling.
-/// - If the current route is a root screen → show exit confirmation dialog
-/// - Otherwise → let GoRouter pop normally
+/// Handles Android back events on the app's primary routes.
 class _ExitWrapper extends StatelessWidget {
   final Widget child;
   const _ExitWrapper({required this.child});
@@ -124,12 +121,20 @@ class _ExitWrapper extends StatelessWidget {
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
         final router = GoRouter.of(context);
-        // If router can go back, just pop
         if (router.canPop()) {
           router.pop();
           return;
         }
-        // Root screen — ask user if they want to exit
+
+        final location = GoRouterState.of(context).uri.path;
+        final home = location.startsWith('/my-') || location == '/home'
+            ? '/home'
+            : '/dashboard';
+        if (location != home) {
+          router.go(home);
+          return;
+        }
+
         final shouldExit = await showDialog<bool>(
           context: context,
           builder: (_) => AlertDialog(
@@ -147,9 +152,7 @@ class _ExitWrapper extends StatelessWidget {
             ],
           ),
         );
-        if (shouldExit == true) {
-          SystemNavigator.pop();
-        }
+        if (shouldExit == true) SystemNavigator.pop();
       },
       child: child,
     );

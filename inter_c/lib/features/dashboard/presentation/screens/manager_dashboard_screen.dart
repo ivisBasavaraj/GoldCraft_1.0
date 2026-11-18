@@ -240,7 +240,8 @@ class _ManagerBottomNav extends StatelessWidget {
       child: BottomNavigationBar(
         currentIndex: currentIndex.clamp(0, items.length - 1),
         onTap: (i) {
-          if (i < routes.length) context.go(routes[i]);
+          if (i == currentIndex) return;
+          if (i < routes.length) context.push(routes[i]);
         },
         items: items,
       ),

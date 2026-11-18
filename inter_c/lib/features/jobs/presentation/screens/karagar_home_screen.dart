@@ -193,7 +193,8 @@ class KaragarBottomNav extends StatelessWidget {
         currentIndex: currentIndex,
         onTap: (i) {
           const routes = ['/home', '/my-gold', '/my-payroll', '/profile'];
-          if (i < routes.length) context.go(routes[i]);
+          if (i == currentIndex) return;
+          if (i < routes.length) context.push(routes[i]);
         },
         items: const [
           BottomNavigationBarItem(
