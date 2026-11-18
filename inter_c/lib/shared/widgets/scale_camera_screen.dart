@@ -105,9 +105,13 @@ class _ScaleCameraScreenState extends ConsumerState<ScaleCameraScreen> {
       }
     } on DioException catch (e) {
       if (mounted) setState(() {
+        final responseData = e.response?.data;
+        final message = responseData is Map
+            ? responseData['message'] as String?
+            : null;
         _error = e.response?.statusCode == 422
             ? 'Could not read digits — try better lighting or angle'
-            : 'Request timed out — tap Retry to try again';
+            : message ?? 'OCR service is unavailable — tap Retry to try again';
         _scanning = false;
         _wakingUp = false;
       });
