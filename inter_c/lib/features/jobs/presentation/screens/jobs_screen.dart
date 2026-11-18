@@ -64,6 +64,7 @@ class _JobsScreenState extends ConsumerState<JobsScreen> {
                   onRefresh: () async =>
                       ref.invalidate(allJobsProvider(_statusFilter)),
                   child: ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(16),
                     itemCount: jobs.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
@@ -80,6 +81,7 @@ class _JobsScreenState extends ConsumerState<JobsScreen> {
 
   Widget _buildFilterBar() {
     return Container(
+      width: double.infinity,
       color: GoldCraftColors.pureWhite,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: SingleChildScrollView(
@@ -88,16 +90,72 @@ class _JobsScreenState extends ConsumerState<JobsScreen> {
           children: _statuses
               .map((s) => Padding(
                     padding: const EdgeInsets.only(right: 8),
-                    child: FilterChip(
-                      label: Text(s.$2),
+                    child: _StatusPill(
+                      label: s.$2,
                       selected: _statusFilter == s.$1,
-                      onSelected: (_) =>
-                          setState(() => _statusFilter = s.$1),
-                      selectedColor: GoldCraftColors.jewelryGoldLight,
-                      checkmarkColor: GoldCraftColors.jewelryGoldDark,
+                      onTap: () => setState(() => _statusFilter = s.$1),
                     ),
                   ))
               .toList(),
+        ),
+      ),
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Filter pill with explicit colors.
+//
+// FilterChip takes its label colour from the app-wide chipTheme, which can
+// differ between web and a release APK. Here every colour is set directly, so
+// the text is always visible.
+// -----------------------------------------------------------------------------
+class _StatusPill extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _StatusPill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bg =
+        selected ? GoldCraftColors.jewelryGoldLight : GoldCraftColors.warmIvory;
+    final Color border =
+        selected ? GoldCraftColors.jewelryGold : GoldCraftColors.border;
+    final Color textColor =
+        selected ? GoldCraftColors.jewelryGoldDark : GoldCraftColors.charcoal;
+
+    return Material(
+      color: bg,
+      shape: StadiumBorder(side: BorderSide(color: border, width: 1.2)),
+      child: InkWell(
+        customBorder: const StadiumBorder(),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (selected) ...[
+                Icon(Icons.check_rounded, size: 16, color: textColor),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.2,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  color: textColor,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -154,10 +212,10 @@ class _JobListTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                  '${job.karagarName} · #${job.jobNumber}',
-                  style: const TextStyle(
-                      fontSize: 12, color: GoldCraftColors.textSecondary),
-                ),
+                    '${job.karagarName} · #${job.jobNumber}',
+                    style: const TextStyle(
+                        fontSize: 12, color: GoldCraftColors.textSecondary),
+                  ),
                   const SizedBox(height: 4),
                   Text(
                     'Due ${DateFormat('d MMM').format(job.dueDate)}',

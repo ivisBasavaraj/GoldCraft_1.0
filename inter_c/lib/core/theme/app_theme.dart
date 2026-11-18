@@ -44,7 +44,7 @@ class AppTheme {
         titleTextStyle: GoldCraftTypography.textTheme.headlineSmall,
         systemOverlayStyle: SystemUiOverlayStyle.dark,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: GoldCraftColors.pureWhite,
         elevation: 0,
         shape: RoundedRectangleBorder(
@@ -144,7 +144,7 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         behavior: SnackBarBehavior.floating,
       ),
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         backgroundColor: GoldCraftColors.pureWhite,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         titleTextStyle: GoldCraftTypography.textTheme.headlineSmall,

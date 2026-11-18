@@ -232,8 +232,7 @@ class _RecordPaymentButtonState extends ConsumerState<_RecordPaymentButton> {
                       controller: ctrl,
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
-                          labelText: 'Amount (\u20b9)',
-                          prefixText: '\u20b9 '),
+                          labelText: 'Amount (\u20b9)', prefixText: '\u20b9 '),
                     ),
                     actions: [
                       TextButton(

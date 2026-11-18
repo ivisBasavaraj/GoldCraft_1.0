@@ -5,7 +5,8 @@ import '../../../../core/network/dio_client.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../shared/widgets/gc_states.dart';
 
-final _dashboardReportProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+final _dashboardReportProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
   final dio = ref.read(dioProvider);
   try {
     final res = await dio.get('/reports/dashboard');
@@ -39,15 +40,6 @@ class ReportsScreen extends ConsumerWidget {
       backgroundColor: GoldCraftColors.background,
       appBar: AppBar(
         title: const Text('Reports'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: () {
-              ref.invalidate(_dashboardReportProvider);
-              ref.invalidate(_meltingGroupReportProvider);
-            },
-          ),
-        ],
       ),
       body: RefreshIndicator(
         color: GoldCraftColors.jewelryGold,
@@ -73,7 +65,8 @@ class ReportsScreen extends ConsumerWidget {
               error: (e, _) => GcErrorState(message: e.toString()),
               data: (groups) => Column(
                 children: groups
-                    .map((g) => _MeltingGroupTile(group: g as Map<String, dynamic>))
+                    .map((g) =>
+                        _MeltingGroupTile(group: g as Map<String, dynamic>))
                     .toList(),
               ),
             ),
@@ -112,9 +105,12 @@ class _DashboardReport extends StatelessWidget {
         ]),
         const SizedBox(height: 12),
         _card([
-          _stat('Gold Issued', '${((gold['totalIssuedGrams'] as num? ?? 0)).toStringAsFixed(1)} g'),
-          _stat('Returned', '${((gold['totalReturnedGrams'] as num? ?? 0)).toStringAsFixed(1)} g'),
-          _stat('In Circulation', '${((gold['inCirculationGrams'] as num? ?? 0)).toStringAsFixed(1)} g'),
+          _stat('Gold Issued',
+              '${((gold['totalIssuedGrams'] as num? ?? 0)).toStringAsFixed(1)} g'),
+          _stat('Returned',
+              '${((gold['totalReturnedGrams'] as num? ?? 0)).toStringAsFixed(1)} g'),
+          _stat('In Circulation',
+              '${((gold['inCirculationGrams'] as num? ?? 0)).toStringAsFixed(1)} g'),
         ]),
         const SizedBox(height: 12),
         _card([

@@ -5,9 +5,12 @@ import '../errors/exceptions.dart';
 import '../storage/token_storage.dart';
 
 final dioProvider = Provider<Dio>((ref) {
+  final normalizedBaseUrl = AppConstants.apiBaseUrl.endsWith('/')
+      ? AppConstants.apiBaseUrl
+      : '${AppConstants.apiBaseUrl}/';
   final dio = Dio(
     BaseOptions(
-      baseUrl: AppConstants.apiBaseUrl,
+      baseUrl: normalizedBaseUrl,
       connectTimeout: AppConstants.apiTimeout,
       receiveTimeout: AppConstants.apiTimeout,
       headers: {'Content-Type': 'application/json'},

@@ -39,11 +39,17 @@ class _ScaleCameraScreenState extends ConsumerState<ScaleCameraScreen> {
   }
 
   Future<void> _initCamera() async {
-    setState(() { _initialising = true; _error = null; });
+    setState(() {
+      _initialising = true;
+      _error = null;
+    });
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
-        setState(() { _error = 'No camera found on this device.'; _initialising = false; });
+        setState(() {
+          _error = 'No camera found on this device.';
+          _initialising = false;
+        });
         return;
       }
       final cam = cameras.firstWhere(
@@ -54,7 +60,12 @@ class _ScaleCameraScreenState extends ConsumerState<ScaleCameraScreen> {
       await _ctrl!.initialize();
       if (mounted) setState(() => _initialising = false);
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _initialising = false; });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _initialising = false;
+        });
+      }
     }
   }
 
@@ -66,7 +77,12 @@ class _ScaleCameraScreenState extends ConsumerState<ScaleCameraScreen> {
 
   Future<void> _capture() async {
     if (_ctrl == null || !_ctrl!.value.isInitialized || _scanning) return;
-    setState(() { _scanning = true; _result = null; _error = null; _wakingUp = false; });
+    setState(() {
+      _scanning = true;
+      _result = null;
+      _error = null;
+      _wakingUp = false;
+    });
 
     try {
       final xFile = await _ctrl!.takePicture();
@@ -90,7 +106,9 @@ class _ScaleCameraScreenState extends ConsumerState<ScaleCameraScreen> {
       final res = await ocrDio.post('/ocr/read-scale', data: formData);
       final data = (res.data['data'] ?? res.data) as Map<String, dynamic>;
 
-      try { File(xFile.path).deleteSync(); } catch (_) {}
+      try {
+        File(xFile.path).deleteSync();
+      } catch (_) {}
 
       if (mounted) {
         setState(() {
@@ -104,19 +122,23 @@ class _ScaleCameraScreenState extends ConsumerState<ScaleCameraScreen> {
         });
       }
     } on DioException catch (e) {
-      if (mounted) setState(() {
-        _error = e.response?.statusCode == 422
-            ? 'Could not read digits — try better lighting or angle'
-            : 'Request timed out — tap Retry to try again';
-        _scanning = false;
-        _wakingUp = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.response?.statusCode == 422
+              ? 'Could not read digits — try better lighting or angle'
+              : 'Request timed out — tap Retry to try again';
+          _scanning = false;
+          _wakingUp = false;
+        });
+      }
     } catch (e) {
-      if (mounted) setState(() {
-        _error = 'Error: ${e.toString()}';
-        _scanning = false;
-        _wakingUp = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = 'Error: ${e.toString()}';
+          _scanning = false;
+          _wakingUp = false;
+        });
+      }
     }
   }
 
@@ -124,7 +146,10 @@ class _ScaleCameraScreenState extends ConsumerState<ScaleCameraScreen> {
     if (_result != null) Navigator.of(context).pop(_result);
   }
 
-  void _retake() => setState(() { _result = null; _error = null; });
+  void _retake() => setState(() {
+        _result = null;
+        _error = null;
+      });
 
   @override
   Widget build(BuildContext context) {
@@ -140,7 +165,9 @@ class _ScaleCameraScreenState extends ConsumerState<ScaleCameraScreen> {
         ),
       ),
       body: _initialising
-          ? const Center(child: CircularProgressIndicator(color: GoldCraftColors.jewelryGold))
+          ? const Center(
+              child:
+                  CircularProgressIndicator(color: GoldCraftColors.jewelryGold))
           : _error != null && _ctrl == null
               ? _ErrorView(message: _error!, onRetry: _initCamera)
               : Column(
@@ -171,7 +198,8 @@ class _ScaleCameraScreenState extends ConsumerState<ScaleCameraScreen> {
                                         'Processing image...\nThis may take a few seconds',
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
-                                            color: Colors.white70, fontSize: 13),
+                                            color: Colors.white70,
+                                            fontSize: 13),
                                       ),
                                     ),
                                   ],
@@ -205,7 +233,7 @@ class _ScaleCameraScreenState extends ConsumerState<ScaleCameraScreen> {
 class _TargetOverlayPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final dimPaint = Paint()..color = Colors.black.withOpacity(0.45);
+    final dimPaint = Paint()..color = Colors.black.withValues(alpha: 0.45);
     final targetRect = Rect.fromCenter(
       center: Offset(size.width / 2, size.height * 0.42),
       width: size.width * 0.75,
@@ -218,16 +246,16 @@ class _TargetOverlayPainter extends CustomPainter {
     canvas.drawRRect(
       RRect.fromRectAndRadius(targetRect, const Radius.circular(8)),
       Paint()
-        ..color = GoldCraftColors.jewelryGold.withOpacity(0.8)
+        ..color = GoldCraftColors.jewelryGold.withValues(alpha: 0.8)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2,
     );
 
     const len = 18.0;
     final corners = [
-      [targetRect.topLeft,     const Offset(len, 0),  const Offset(0, len)],
-      [targetRect.topRight,    const Offset(-len, 0), const Offset(0, len)],
-      [targetRect.bottomLeft,  const Offset(len, 0),  const Offset(0, -len)],
+      [targetRect.topLeft, const Offset(len, 0), const Offset(0, len)],
+      [targetRect.topRight, const Offset(-len, 0), const Offset(0, len)],
+      [targetRect.bottomLeft, const Offset(len, 0), const Offset(0, -len)],
       [targetRect.bottomRight, const Offset(-len, 0), const Offset(0, -len)],
     ];
     final cornerPaint = Paint()
@@ -237,9 +265,9 @@ class _TargetOverlayPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     for (final c in corners) {
-      final origin = c[0] as Offset;
-      canvas.drawLine(origin, origin + (c[1] as Offset), cornerPaint);
-      canvas.drawLine(origin, origin + (c[2] as Offset), cornerPaint);
+      final origin = c[0];
+      canvas.drawLine(origin, origin + c[1], cornerPaint);
+      canvas.drawLine(origin, origin + c[2], cornerPaint);
     }
   }
 
@@ -301,7 +329,8 @@ class _CapturePanel extends StatelessWidget {
                 ? GoldCraftColors.jewelryGold
                 : Colors.grey.shade700,
             foregroundColor: Colors.black,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
           icon: const Icon(Icons.camera_alt_rounded, size: 22),
           label: const Text('Capture',
@@ -337,7 +366,9 @@ class _ResultPanel extends StatelessWidget {
           decoration: BoxDecoration(
             color: const Color(0xFF2A2A2A),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: GoldCraftColors.jewelryGold.withOpacity(0.4)),
+            border: Border.all(
+              color: GoldCraftColors.jewelryGold.withValues(alpha: 0.4),
+            ),
           ),
           child: Column(children: [
             const Text('Scale Reading',
@@ -354,7 +385,8 @@ class _ResultPanel extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              const Icon(Icons.verified_outlined, size: 13, color: Colors.white38),
+              const Icon(Icons.verified_outlined,
+                  size: 13, color: Colors.white38),
               const SizedBox(width: 4),
               Text('Confidence: $confPct%',
                   style: TextStyle(fontSize: 12, color: confColor)),
@@ -403,7 +435,8 @@ class _ErrorView extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.camera_alt_outlined, color: Colors.white38, size: 48),
+          const Icon(Icons.camera_alt_outlined,
+              color: Colors.white38, size: 48),
           const SizedBox(height: 16),
           Text(message,
               textAlign: TextAlign.center,
