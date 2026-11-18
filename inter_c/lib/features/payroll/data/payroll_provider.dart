@@ -20,22 +20,25 @@ final payrollsProvider =
     final data = _safe(res.data);
     final inner = (data['data'] as Map<String, dynamic>?) ?? data;
     final list = (inner['items'] as List<dynamic>?) ?? [];
-    return list.map((p) => Payroll.fromJson(p as Map<String, dynamic>)).toList();
+    return list
+        .map((p) => Payroll.fromJson(p as Map<String, dynamic>))
+        .toList();
   } on DioException catch (e) {
     throw mapDioError(e);
   }
 });
 
 /// Fetches payroll records scoped to the logged-in karagar.
-final myPayrollsProvider =
-    FutureProvider<List<Payroll>>((ref) async {
+final myPayrollsProvider = FutureProvider<List<Payroll>>((ref) async {
   final dio = ref.read(dioProvider);
   try {
     final res = await dio.get('/payroll/my', queryParameters: {'limit': '100'});
     final data = _safe(res.data);
     final inner = (data['data'] as Map<String, dynamic>?) ?? data;
     final list = (inner['items'] as List<dynamic>?) ?? [];
-    return list.map((p) => Payroll.fromJson(p as Map<String, dynamic>)).toList();
+    return list
+        .map((p) => Payroll.fromJson(p as Map<String, dynamic>))
+        .toList();
   } on DioException catch (e) {
     throw mapDioError(e);
   }
@@ -81,11 +84,13 @@ class PayrollRepository {
     }
   }
 
-  /// No-op approve — backend now handles status internally via POST /payroll.
+  /// Approves the payroll and recalculates net payable on the backend.
   Future<Payroll> approve(String id,
       {double? incentiveRupees, double? penaltyRupees, String? notes}) async {
     try {
-      final res = await _dio.patch('/payroll/$id', data: {
+      final res = await _dio.post('/payroll/$id/approve', data: {
+        if (incentiveRupees != null) 'approvedIncentiveRupees': incentiveRupees,
+        if (penaltyRupees != null) 'approvedPenaltyRupees': penaltyRupees,
         if (notes != null) 'notes': notes,
       });
       final data = _safe(res.data);
@@ -98,8 +103,8 @@ class PayrollRepository {
 
   Future<Payroll> recordPayment(String id, double amountRupees) async {
     try {
-      final res = await _dio.patch('/payroll/$id', data: {
-        'paidRupees': amountRupees,
+      final res = await _dio.post('/payroll/$id/payment', data: {
+        'amountRupees': amountRupees,
       });
       final data = _safe(res.data);
       final inner = data['data'] as Map<String, dynamic>? ?? data;

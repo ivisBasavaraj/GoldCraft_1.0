@@ -17,8 +17,6 @@ class KaragarsScreen extends ConsumerStatefulWidget {
 class _KaragarsScreenState extends ConsumerState<KaragarsScreen> {
   final _searchCtrl = TextEditingController();
   String _searchQuery = '';
-  String? _groupFilter;
-  bool _activeOnly = true;
 
   @override
   void dispose() {
@@ -27,14 +25,11 @@ class _KaragarsScreenState extends ConsumerState<KaragarsScreen> {
   }
 
   List<Karagar> _filter(List<Karagar> all) {
+    final q = _searchQuery.toLowerCase();
+    if (q.isEmpty) return all;
     return all.where((k) {
-      final q = _searchQuery.toLowerCase();
-      final matchSearch = q.isEmpty ||
-          k.name.toLowerCase().contains(q) ||
+      return k.name.toLowerCase().contains(q) ||
           k.employeeCode.toLowerCase().contains(q);
-      final matchGroup = _groupFilter == null || k.meltingGroup == _groupFilter;
-      final matchActive = !_activeOnly || k.isActive;
-      return matchSearch && matchGroup && matchActive;
     }).toList();
   }
 
@@ -56,7 +51,6 @@ class _KaragarsScreenState extends ConsumerState<KaragarsScreen> {
       body: Column(
         children: [
           _buildSearchBar(),
-          _buildFilterChips(karagarsAsync.valueOrNull ?? []),
           Expanded(
             child: karagarsAsync.when(
               loading: () => const GcLoadingIndicator(message: 'Loading artisans...'),
@@ -70,7 +64,7 @@ class _KaragarsScreenState extends ConsumerState<KaragarsScreen> {
                   return const GcEmptyState(
                     icon: Icons.people_outline_rounded,
                     title: 'No Artisans Found',
-                    subtitle: 'Try adjusting your search or filters.',
+                    subtitle: 'Try adjusting your search.',
                   );
                 }
                 return ListView.separated(
@@ -107,43 +101,6 @@ class _KaragarsScreenState extends ConsumerState<KaragarsScreen> {
                 )
               : null,
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFilterChips(List<Karagar> all) {
-    final groups = all.map((k) => k.meltingGroup).toSet().toList()..sort();
-
-    return Container(
-      color: GoldCraftColors.pureWhite,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            FilterChip(
-              label: const Text('Active Only'),
-              selected: _activeOnly,
-              onSelected: (v) => setState(() => _activeOnly = v),
-              selectedColor: GoldCraftColors.jewelryGoldLight,
-              checkmarkColor: GoldCraftColors.jewelryGoldDark,
-            ),
-            const SizedBox(width: 8),
-            ...groups.map(
-              (g) => Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: FilterChip(
-                  label: Text(g),
-                  selected: _groupFilter == g,
-                  onSelected: (v) =>
-                      setState(() => _groupFilter = v ? g : null),
-                  selectedColor: GoldCraftColors.jewelryGoldLight,
-                  checkmarkColor: GoldCraftColors.jewelryGoldDark,
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );

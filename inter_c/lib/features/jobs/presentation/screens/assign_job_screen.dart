@@ -11,7 +11,8 @@ import '../../../../shared/widgets/gc_states.dart';
 class AssignJobScreen extends ConsumerStatefulWidget {
   final String? preselectedKaragarId;
   final String? preselectedKaragarName;
-  const AssignJobScreen({super.key, this.preselectedKaragarId, this.preselectedKaragarName});
+  const AssignJobScreen(
+      {super.key, this.preselectedKaragarId, this.preselectedKaragarName});
 
   @override
   ConsumerState<AssignJobScreen> createState() => _AssignJobScreenState();
@@ -20,7 +21,6 @@ class AssignJobScreen extends ConsumerStatefulWidget {
 class _AssignJobScreenState extends ConsumerState<AssignJobScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleCtrl = TextEditingController();
-  final _weightCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
 
   String? _selectedKaragarId;
@@ -38,7 +38,6 @@ class _AssignJobScreenState extends ConsumerState<AssignJobScreen> {
   @override
   void dispose() {
     _titleCtrl.dispose();
-    _weightCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
   }
@@ -56,8 +55,6 @@ class _AssignJobScreenState extends ConsumerState<AssignJobScreen> {
       final dio = ref.read(dioProvider);
       await dio.post('/jobs', data: {
         'title': _titleCtrl.text.trim(),
-        'requiredWeightMg':
-            (double.parse(_weightCtrl.text.trim()) * 1000).round(),
         'karagarId': _selectedKaragarId,
         'dueDate': _dueDate.toIso8601String(),
         if (_notesCtrl.text.isNotEmpty) 'notes': _notesCtrl.text.trim(),
@@ -98,7 +95,6 @@ class _AssignJobScreenState extends ConsumerState<AssignJobScreen> {
           children: [
             _section('Job Details'),
             _field(_titleCtrl, 'Job Title', hint: 'e.g. Bangle Work'),
-            _weightField(),
             const SizedBox(height: 16),
             _section('Due Date'),
             GestureDetector(
@@ -149,7 +145,9 @@ class _AssignJobScreenState extends ConsumerState<AssignJobScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          _selectedKaragarName ?? widget.preselectedKaragarName ?? '',
+                          _selectedKaragarName ??
+                              widget.preselectedKaragarName ??
+                              '',
                           style: const TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
@@ -178,7 +176,8 @@ class _AssignJobScreenState extends ConsumerState<AssignJobScreen> {
                                   child: Text('${k.name} (${k.employeeCode})'),
                                 ))
                             .toList(),
-                        onChanged: (v) => setState(() => _selectedKaragarId = v),
+                        onChanged: (v) =>
+                            setState(() => _selectedKaragarId = v),
                       );
                     },
                   ),
@@ -205,19 +204,6 @@ class _AssignJobScreenState extends ConsumerState<AssignJobScreen> {
       ),
     );
   }
-
-  Widget _weightField() => Padding(
-        padding: const EdgeInsets.only(bottom: 14),
-        child: TextFormField(
-          controller: _weightCtrl,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            labelText: 'Weight (g)',
-          ),
-          validator: (v) =>
-              (v == null || v.trim().isEmpty) ? 'Required' : null,
-        ),
-      );
 
   Widget _section(String title) => Padding(
         padding: const EdgeInsets.only(bottom: 12),
@@ -251,5 +237,3 @@ class _AssignJobScreenState extends ConsumerState<AssignJobScreen> {
         ),
       );
 }
-
-

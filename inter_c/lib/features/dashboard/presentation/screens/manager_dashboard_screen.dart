@@ -17,6 +17,7 @@ class ManagerDashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final dashAsync = ref.watch(dashboardProvider);
     final user = ref.watch(authUserProvider).valueOrNull;
+    final isAdmin = user?.isAdmin == true;
 
     return Scaffold(
       backgroundColor: GoldCraftColors.background,
@@ -24,14 +25,40 @@ class ManagerDashboardScreen extends ConsumerWidget {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('GoldCraft ERP',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            Row(
+              children: [
+                const Text(
+                  'GoldCraft ERP',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+                if (isAdmin) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: GoldCraftColors.jewelryGoldLight,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'ADMIN',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: GoldCraftColors.jewelryGoldDark,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
             Text(
-              'Good ${_greeting()}, ${user?.name.split(' ').first ?? 'Manager'}',
+              'Good ${_greeting()}, ${user?.name.split(' ').first ?? (isAdmin ? 'Admin' : 'Manager')}',
               style: const TextStyle(
-                  fontSize: 12,
-                  color: GoldCraftColors.textSecondary,
-                  fontWeight: FontWeight.w400),
+                fontSize: 12,
+                color: GoldCraftColors.textSecondary,
+                fontWeight: FontWeight.w400,
+              ),
             ),
           ],
         ),
@@ -60,7 +87,8 @@ class ManagerDashboardScreen extends ConsumerWidget {
         ],
       ),
       body: dashAsync.when(
-        loading: () => const GcLoadingIndicator(message: 'Loading dashboard...'),
+        loading: () =>
+            const GcLoadingIndicator(message: 'Loading dashboard...'),
         error: (e, _) => GcErrorState(
           message: e.toString(),
           onRetry: () => ref.invalidate(dashboardProvider),
@@ -69,11 +97,20 @@ class ManagerDashboardScreen extends ConsumerWidget {
           color: GoldCraftColors.jewelryGold,
           onRefresh: () async => ref.invalidate(dashboardProvider),
           child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(20),
             children: [
               // Treasury Vault
               TreasuryVaultCard(treasury: summary.treasury),
               const SizedBox(height: 28),
+
+              // ADMIN ONLY
+              if (isAdmin) ...[
+                const GcSectionHeader(title: 'Admin Controls'),
+                const SizedBox(height: 16),
+                _buildAdminControls(context),
+                const SizedBox(height: 28),
+              ],
 
               // KPI Cards
               GcSectionHeader(
@@ -101,7 +138,8 @@ class ManagerDashboardScreen extends ConsumerWidget {
                   ),
                   GcMetricCard(
                     title: 'Gold Issued',
-                    value: '${summary.totalGoldIssuedGrams.toStringAsFixed(1)} g',
+                    value:
+                        '${summary.totalGoldIssuedGrams.toStringAsFixed(1)} g',
                     subtitle: 'Total issued',
                     icon: Icons.swap_horiz_rounded,
                     iconColor: GoldCraftColors.jewelryGoldDark,
@@ -139,18 +177,117 @@ class ManagerDashboardScreen extends ConsumerWidget {
           ),
         ),
       ),
-      bottomNavigationBar: _ManagerBottomNav(currentIndex: 0, isAdmin: user?.isAdmin == true),
+      bottomNavigationBar: const _ManagerBottomNav(currentIndex: 0),
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Admin controls (list layout is easier to tap on mobile)
+  // ---------------------------------------------------------------------------
+  Widget _buildAdminControls(BuildContext context) {
+    final items = [
+      (
+        Icons.manage_accounts_rounded,
+        'Users',
+        'Manage staff & roles',
+        '/users'
+      ),
+      (
+        Icons.person_add_outlined,
+        'Add User',
+        'Create new account',
+        '/users/new'
+      ),
+      (
+        Icons.bar_chart_rounded,
+        'Reports',
+        'Business analytics',
+        '/reports'
+      ),
+      (
+        Icons.settings_outlined,
+        'Settings',
+        'App configuration',
+        '/settings'
+      ),
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: GoldCraftColors.pureWhite,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: GoldCraftColors.divider),
+      ),
+      child: Column(
+        children: [
+          for (int i = 0; i < items.length; i++) ...[
+            ListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: GoldCraftColors.jewelryGoldLight,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  items[i].$1,
+                  color: GoldCraftColors.jewelryGoldDark,
+                  size: 22,
+                ),
+              ),
+              title: Text(
+                items[i].$2,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              subtitle: Text(
+                items[i].$3,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: GoldCraftColors.textSecondary,
+                ),
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => context.push(items[i].$4),
+            ),
+            if (i != items.length - 1) const Divider(height: 1),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Quick actions (same 4 tiles for everyone)
+  // ---------------------------------------------------------------------------
   Widget _buildQuickActions(BuildContext context, AuthUser? user) {
     final actions = [
-      (Icons.add_task_rounded, 'Assign Work', '/jobs/new', GoldCraftColors.jewelryGold),
-      (Icons.scale_outlined, 'Issue Gold', '/material-issuance/new', GoldCraftColors.softAmberText),
-      (Icons.keyboard_return_outlined, 'Receive Gold', '/material-receipts/new', GoldCraftColors.softGreenText),
-      (Icons.currency_rupee_rounded, 'Advance', '/advances/new', GoldCraftColors.softBlueText),
-      if (user?.isAdmin == true)
-        (Icons.person_add_outlined, 'Add User', '/users/new', GoldCraftColors.softRedText),
+      (
+        Icons.add_task_rounded,
+        'Assign Work',
+        '/jobs/new',
+        GoldCraftColors.jewelryGold
+      ),
+      (
+        Icons.scale_outlined,
+        'Issue Gold',
+        '/material-issuance/new',
+        GoldCraftColors.softAmberText
+      ),
+      (
+        Icons.keyboard_return_outlined,
+        'Receive Gold',
+        '/material-receipts/new',
+        GoldCraftColors.softGreenText
+      ),
+      (
+        Icons.currency_rupee_rounded,
+        'Advance',
+        '/advances/new',
+        GoldCraftColors.softBlueText
+      ),
     ];
 
     return Wrap(
@@ -168,7 +305,8 @@ class ManagerDashboardScreen extends ConsumerWidget {
                     color: GoldCraftColors.pureWhite,
                     borderRadius: BorderRadius.all(Radius.circular(14)),
                     border: Border.fromBorderSide(
-                        BorderSide(color: GoldCraftColors.divider)),
+                      BorderSide(color: GoldCraftColors.divider),
+                    ),
                   ),
                   child: Column(
                     children: [
@@ -207,30 +345,50 @@ class ManagerDashboardScreen extends ConsumerWidget {
   }
 }
 
+// -----------------------------------------------------------------------------
+// Bottom navigation (5 tabs for everyone; admin extras live in Admin Controls)
+// -----------------------------------------------------------------------------
 class _ManagerBottomNav extends StatelessWidget {
   final int currentIndex;
-  final bool isAdmin;
-  const _ManagerBottomNav({required this.currentIndex, this.isAdmin = false});
+  const _ManagerBottomNav({required this.currentIndex});
+
+  static const _routes = [
+    '/dashboard',
+    '/karagars',
+    '/jobs',
+    '/treasury',
+    '/reports',
+  ];
 
   @override
   Widget build(BuildContext context) {
-    final routes = ['/dashboard', '/karagars', '/jobs', '/treasury', '/reports'];
-    final items = [
-      const BottomNavigationBarItem(icon: Icon(Icons.dashboard_outlined), activeIcon: Icon(Icons.dashboard_rounded), label: 'Dashboard'),
-      const BottomNavigationBarItem(icon: Icon(Icons.people_outline), activeIcon: Icon(Icons.people_rounded), label: 'Karagars'),
-      const BottomNavigationBarItem(icon: Icon(Icons.work_outline_rounded), activeIcon: Icon(Icons.work_rounded), label: 'Jobs'),
-      const BottomNavigationBarItem(icon: Icon(Icons.account_balance_outlined), activeIcon: Icon(Icons.account_balance_rounded), label: 'Treasury'),
-      const BottomNavigationBarItem(icon: Icon(Icons.bar_chart_outlined), activeIcon: Icon(Icons.bar_chart_rounded), label: 'Reports'),
+    const items = [
+      BottomNavigationBarItem(
+        icon: Icon(Icons.dashboard_outlined),
+        activeIcon: Icon(Icons.dashboard_rounded),
+        label: 'Dashboard',
+      ),
+      BottomNavigationBarItem(
+        icon: Icon(Icons.people_outline),
+        activeIcon: Icon(Icons.people_rounded),
+        label: 'Karagars',
+      ),
+      BottomNavigationBarItem(
+        icon: Icon(Icons.work_outline_rounded),
+        activeIcon: Icon(Icons.work_rounded),
+        label: 'Jobs',
+      ),
+      BottomNavigationBarItem(
+        icon: Icon(Icons.account_balance_outlined),
+        activeIcon: Icon(Icons.account_balance_rounded),
+        label: 'Treasury',
+      ),
+      BottomNavigationBarItem(
+        icon: Icon(Icons.bar_chart_outlined),
+        activeIcon: Icon(Icons.bar_chart_rounded),
+        label: 'Reports',
+      ),
     ];
-
-    if (isAdmin) {
-      routes.add('/users');
-      items.add(const BottomNavigationBarItem(
-        icon: Icon(Icons.manage_accounts_outlined),
-        activeIcon: Icon(Icons.manage_accounts_rounded),
-        label: 'Users',
-      ));
-    }
 
     return Container(
       decoration: const BoxDecoration(
@@ -241,7 +399,7 @@ class _ManagerBottomNav extends StatelessWidget {
         currentIndex: currentIndex.clamp(0, items.length - 1),
         onTap: (i) {
           if (i == currentIndex) return;
-          if (i < routes.length) context.push(routes[i]);
+          context.go(_routes[i]);
         },
         items: items,
       ),
