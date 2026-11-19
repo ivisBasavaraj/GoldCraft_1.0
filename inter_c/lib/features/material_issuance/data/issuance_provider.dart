@@ -54,19 +54,28 @@ class IssuanceRepository {
 
   Future<MaterialIssuance> create({
     required String jobId,
-    required double physicalWeightMg,
     String? notes,
     double? managerOcrGrams,
     double? ocrConfidence,
+    String? ocrImagePath,
   }) async {
     try {
-      final res = await _dio.post('/material-issuance', data: {
+      final payload = {
         'jobId': jobId,
-        'physicalWeightMg': physicalWeightMg,
         if (notes != null) 'notes': notes,
         if (managerOcrGrams != null) 'managerOcrGrams': managerOcrGrams,
         if (ocrConfidence != null) 'ocrConfidence': ocrConfidence,
-      });
+      };
+      final dataToSend = ocrImagePath == null
+          ? payload
+          : FormData.fromMap({
+              ...payload,
+              'ocrImage': await MultipartFile.fromFile(
+                ocrImagePath,
+                filename: 'scale-capture.jpg',
+              ),
+            });
+      final res = await _dio.post('/material-issuance', data: dataToSend);
       final data = _safe(res.data);
       return MaterialIssuance.fromJson(data['data'] as Map<String, dynamic>);
     } on DioException catch (e) {

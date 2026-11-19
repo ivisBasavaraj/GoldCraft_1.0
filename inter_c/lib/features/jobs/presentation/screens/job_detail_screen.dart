@@ -8,6 +8,7 @@ import '../../domain/job_model.dart';
 import '../../../material_issuance/data/issuance_provider.dart';
 import '../../../material_receipts/data/receipts_provider.dart';
 import '../../../../core/network/dio_client.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../../../shared/widgets/gc_badge.dart';
 import '../../../../shared/widgets/gc_states.dart';
 import '../../../../core/theme/colors.dart';
@@ -184,7 +185,10 @@ class _JobDetailView extends ConsumerWidget {
                       txId: i.transactionId,
                       weightGrams: i.physicalWeightGrams,
                       isDebit: true,
-                      dateTime: i.createdAt,
+                      dateTime: i.ocrCapturedAt ?? i.createdAt,
+                      ocrImageUrl: i.ocrImageUrl,
+                      ocrReading: i.managerOcrGrams,
+                      ocrCapturedAt: i.ocrCapturedAt,
                     )).toList()),
           ),
           const SizedBox(height: 20),
@@ -320,8 +324,6 @@ class _StatusUpdateButton extends ConsumerWidget {
   }
 
   Future<void> _startWithOcr(BuildContext context, WidgetRef ref) async {
-    final messenger = ScaffoldMessenger.of(context);
-
     // Step 1: open camera
     final result = await Navigator.of(context).push<OcrResult>(
       MaterialPageRoute(builder: (_) => const ScaleCameraScreen()),
@@ -331,9 +333,16 @@ class _StatusUpdateButton extends ConsumerWidget {
     // Step 2: send to backend for verification
     try {
       final dio = ref.read(dioProvider);
-      await dio.post('/jobs/${job.id}/verify-ocr', data: {
-        'karagarOcrGrams': result.valueGrams,
-      });
+      await dio.post(
+        '/jobs/${job.id}/verify-ocr',
+        data: FormData.fromMap({
+          'karagarOcrGrams': result.valueGrams,
+          'karagarOcrImage': await MultipartFile.fromFile(
+            result.imagePath,
+            filename: 'karagar-scale-capture.jpg',
+          ),
+        }),
+      );
 
       // Step 3: verification passed — update status
       if (context.mounted) {
@@ -344,13 +353,85 @@ class _StatusUpdateButton extends ConsumerWidget {
       final body = e.response?.data;
       final msg = (body is Map ? body['message'] : null) ??
           mapDioError(e).message;
-      messenger.showSnackBar(SnackBar(
-        content: Text(msg),
-        backgroundColor: GoldCraftColors.softRedText,
-        duration: const Duration(seconds: 5),
-      ));
+      if (e.response?.statusCode == 409) {
+        await _showOcrMismatchDialog(context, body, msg);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(msg),
+          backgroundColor: GoldCraftColors.softRedText,
+        ));
+      }
     }
   }
+
+  Future<void> _showOcrMismatchDialog(
+    BuildContext context,
+    dynamic body,
+    String fallbackMessage,
+  ) {
+    final data = body is Map ? body['data'] : null;
+    final managerReading = data is Map ? data['managerOcrGrams'] : null;
+    final karagarReading = data is Map ? data['karagarOcrGrams'] : null;
+    final difference = data is Map ? data['diff'] : null;
+    final tolerance = data is Map ? data['tolerance'] : null;
+
+    String grams(dynamic value) => value is num
+        ? '${value.toStringAsFixed(3)} g'
+        : 'Unavailable';
+
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.warning_amber_rounded,
+            color: GoldCraftColors.softRedText, size: 38),
+        title: const Text('Weight does not match'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text(
+            'The scale reading must match the manager’s issued-gold reading before work can start.',
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 18),
+          _mismatchReading('Manager OCR', grams(managerReading)),
+          _mismatchReading('Your OCR', grams(karagarReading)),
+          const Divider(height: 24),
+          _mismatchReading('Difference', grams(difference),
+              valueColor: GoldCraftColors.softRedText),
+          _mismatchReading('Allowed tolerance', grams(tolerance)),
+          const SizedBox(height: 12),
+          Text(fallbackMessage,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  fontSize: 12, color: GoldCraftColors.textSecondary)),
+        ]),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _mismatchReading(String label, String value, {Color? valueColor}) =>
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(children: [
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 13, color: GoldCraftColors.textSecondary)),
+          const Spacer(),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: valueColor ?? GoldCraftColors.charcoal)),
+        ]),
+      );
 
   Future<void> _updateStatus(
       BuildContext context, WidgetRef ref, String status, String label) async {
@@ -381,12 +462,18 @@ class _TxRow {
   final bool isDebit;
   final DateTime dateTime;
   final String? type;
+  final String? ocrImageUrl;
+  final double? ocrReading;
+  final DateTime? ocrCapturedAt;
   const _TxRow({
     required this.txId,
     required this.weightGrams,
     required this.isDebit,
     required this.dateTime,
     this.type,
+    this.ocrImageUrl,
+    this.ocrReading,
+    this.ocrCapturedAt,
   });
 }
 
@@ -398,6 +485,7 @@ class _TxTable extends StatelessWidget {
   Widget build(BuildContext context) {
     final dateFmt = DateFormat('d MMM yyyy');
     final timeFmt = DateFormat('h:mm a');
+    final hasOcrEvidence = items.any((r) => r.ocrImageUrl != null);
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -427,6 +515,7 @@ class _TxTable extends StatelessWidget {
             const DataColumn(label: Text('WEIGHT'), numeric: true),
             if (items.any((r) => r.type != null))
               const DataColumn(label: Text('TYPE')),
+            if (hasOcrEvidence) const DataColumn(label: Text('OCR EVIDENCE')),
             const DataColumn(label: Text('DATE')),
             const DataColumn(label: Text('TIME')),
           ],
@@ -449,6 +538,16 @@ class _TxTable extends StatelessWidget {
                     style: const TextStyle(
                         fontSize: 11,
                         color: GoldCraftColors.textSecondary))),
+              if (hasOcrEvidence)
+                DataCell(r.ocrImageUrl == null
+                    ? const Text('No scan',
+                        style: TextStyle(
+                            fontSize: 11, color: GoldCraftColors.textHint))
+                    : _OcrEvidenceCell(
+                        imageUrl: r.ocrImageUrl!,
+                        reading: r.ocrReading,
+                        capturedAt: r.ocrCapturedAt ?? r.dateTime,
+                      )),
               DataCell(Text(dateFmt.format(r.dateTime),
                   style: const TextStyle(
                       fontSize: 11,
@@ -460,6 +559,89 @@ class _TxTable extends StatelessWidget {
             ]);
           }).toList(),
         ),
+      ),
+    );
+  }
+}
+
+class _OcrEvidenceCell extends StatelessWidget {
+  final String imageUrl;
+  final double? reading;
+  final DateTime capturedAt;
+  const _OcrEvidenceCell({
+    required this.imageUrl,
+    required this.reading,
+    required this.capturedAt,
+  });
+
+  String get _absoluteImageUrl =>
+      Uri.parse(AppConstants.apiBaseUrl).resolve(imageUrl).toString();
+
+  @override
+  Widget build(BuildContext context) {
+    final capturedLabel =
+        DateFormat('d MMM yyyy, h:mm:ss a').format(capturedAt);
+    return InkWell(
+      onTap: () => showDialog<void>(
+        context: context,
+        builder: (context) => Dialog(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              AspectRatio(
+                aspectRatio: 4 / 3,
+                child: Image.network(_absoluteImageUrl, fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Center(
+                        child: Text('Evidence image unavailable'))),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      reading == null
+                          ? 'Scale capture'
+                          : 'Live scale: ${reading!.toStringAsFixed(3)} g',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 4),
+                    Text('Captured: $capturedLabel',
+                        style: const TextStyle(
+                            fontSize: 12, color: GoldCraftColors.textSecondary)),
+                  ],
+                ),
+              ),
+            ]),
+          ),
+        ),
+      ),
+      child: SizedBox(
+        width: 132,
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(5),
+            child: Image.network(_absoluteImageUrl,
+                width: 38,
+                height: 38,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const SizedBox(
+                    width: 38,
+                    height: 38,
+                    child: Icon(Icons.broken_image_outlined, size: 18))),
+          ),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              reading == null
+                  ? DateFormat('h:mm:ss a').format(capturedAt)
+                  : '${reading!.toStringAsFixed(3)} g\n${DateFormat('h:mm:ss a').format(capturedAt)}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ]),
       ),
     );
   }

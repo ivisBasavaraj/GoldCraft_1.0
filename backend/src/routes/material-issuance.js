@@ -9,6 +9,16 @@ const Karagar = require('../models/Karagar');
 const { Treasury, TreasuryTx } = require('../models/Treasury');
 const { auth, requireRole } = require('../middleware/auth');
 
+async function withJobTitles(items) {
+  const jobIds = [...new Set(items.map((item) => item.jobId.toString()))];
+  const jobs = await Job.find({ _id: { $in: jobIds } }).select('title').lean();
+  const titlesById = new Map(jobs.map((job) => [job._id.toString(), job.title]));
+  return items.map((item) => ({
+    ...(item.toObject ? item.toObject() : item),
+    jobTitle: titlesById.get(item.jobId.toString()) || null,
+  }));
+}
+
 const ocrUploadDir = path.join(__dirname, '../../uploads/ocr');
 fs.mkdirSync(ocrUploadDir, { recursive: true });
 const ocrEvidenceUpload = multer({
@@ -32,7 +42,8 @@ router.get('/my', auth, async (req, res) => {
     const filter = { karagarId: req.user.karagarId };
     if (req.query.jobId) filter.jobId = req.query.jobId;
     const limit = parseInt(req.query.limit) || 100;
-    const items = await MaterialIssuance.find(filter).sort({ createdAt: -1 }).limit(limit);
+    const records = await MaterialIssuance.find(filter).sort({ createdAt: -1 }).limit(limit);
+    const items = await withJobTitles(records);
     res.json({ data: { items, total: items.length } });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -45,7 +56,8 @@ router.get('/', auth, async (req, res) => {
     const filter = {};
     if (req.query.jobId) filter.jobId = req.query.jobId;
     const limit = parseInt(req.query.limit) || 20;
-    const items = await MaterialIssuance.find(filter).sort({ createdAt: -1 }).limit(limit);
+    const records = await MaterialIssuance.find(filter).sort({ createdAt: -1 }).limit(limit);
+    const items = await withJobTitles(records);
     res.json({ data: { items, total: items.length } });
   } catch (err) {
     res.status(500).json({ message: err.message });

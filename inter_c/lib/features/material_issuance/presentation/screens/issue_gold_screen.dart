@@ -18,8 +18,6 @@ class IssueGoldScreen extends ConsumerStatefulWidget {
 }
 
 class _IssueGoldScreenState extends ConsumerState<IssueGoldScreen> {
-  final _formKey   = GlobalKey<FormState>();
-  final _weightCtrl = TextEditingController();
   final _notesCtrl  = TextEditingController();
 
   String? _selectedJobId;
@@ -27,6 +25,7 @@ class _IssueGoldScreenState extends ConsumerState<IssueGoldScreen> {
 
   double? _ocrGrams;
   double? _ocrConfidence;
+  String? _ocrImagePath;
   bool    _ocrScanned = false;
 
   @override
@@ -37,7 +36,6 @@ class _IssueGoldScreenState extends ConsumerState<IssueGoldScreen> {
 
   @override
   void dispose() {
-    _weightCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
   }
@@ -50,8 +48,8 @@ class _IssueGoldScreenState extends ConsumerState<IssueGoldScreen> {
     setState(() {
       _ocrGrams      = result.valueGrams;
       _ocrConfidence = result.confidence;
+      _ocrImagePath = result.imagePath;
       _ocrScanned    = true;
-      _weightCtrl.text = result.valueGrams.toStringAsFixed(3);
     });
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(
@@ -62,10 +60,16 @@ class _IssueGoldScreenState extends ConsumerState<IssueGoldScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
     if (_selectedJobId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Please select a job')));
+      return;
+    }
+    if (_ocrGrams == null || _ocrImagePath == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Scan the scale before issuing gold'),
+        backgroundColor: GoldCraftColors.softRedText,
+      ));
       return;
     }
     setState(() => _isSubmitting = true);
@@ -73,11 +77,10 @@ class _IssueGoldScreenState extends ConsumerState<IssueGoldScreen> {
       final repo = ref.read(issuanceRepositoryProvider);
       await repo.create(
         jobId: _selectedJobId!,
-        physicalWeightMg:
-            (double.parse(_weightCtrl.text.trim()) * 1000).roundToDouble(),
         notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
         managerOcrGrams: _ocrGrams,
         ocrConfidence: _ocrConfidence,
+        ocrImagePath: _ocrImagePath,
       );
       if (!mounted) return;
       context.pop();
@@ -104,9 +107,7 @@ class _IssueGoldScreenState extends ConsumerState<IssueGoldScreen> {
     return Scaffold(
       backgroundColor: GoldCraftColors.background,
       appBar: AppBar(title: const Text('Issue Gold')),
-      body: Form(
-        key: _formKey,
-        child: ListView(
+      body: ListView(
           padding: const EdgeInsets.all(20),
           children: [
             _label('Select Job'),
@@ -148,28 +149,6 @@ class _IssueGoldScreenState extends ConsumerState<IssueGoldScreen> {
             const SizedBox(height: 20),
 
             // ── Weight (auto-filled by OCR) ───────────────────────────────
-            _label('Physical Weight (grams)'),
-            TextFormField(
-              controller: _weightCtrl,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
-                hintText: 'e.g. 120.500',
-                suffixText: 'g',
-                prefixIcon: const Icon(Icons.scale_outlined),
-                suffixIcon: _ocrScanned
-                    ? const Icon(Icons.verified_rounded,
-                        color: GoldCraftColors.softGreenText, size: 20)
-                    : null,
-              ),
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'Required';
-                if (double.tryParse(v.trim()) == null) return 'Invalid number';
-                return null;
-              },
-            ),
-            const SizedBox(height: 20),
-
             _label('Notes (optional)'),
             TextFormField(
               controller: _notesCtrl,
@@ -192,7 +171,6 @@ class _IssueGoldScreenState extends ConsumerState<IssueGoldScreen> {
             ),
           ],
         ),
-      ),
     );
   }
 

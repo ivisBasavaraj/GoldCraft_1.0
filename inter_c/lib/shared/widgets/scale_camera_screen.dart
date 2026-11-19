@@ -3,6 +3,7 @@ import 'package:camera/camera.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image/image.dart' as img;
 import '../../../core/network/dio_client.dart';
 import '../../../core/theme/colors.dart';
 
@@ -10,10 +11,12 @@ class OcrResult {
   final double valueGrams;
   final String reading;
   final double confidence;
+  final String imagePath;
   const OcrResult({
     required this.valueGrams,
     required this.reading,
     required this.confidence,
+    required this.imagePath,
   });
 }
 
@@ -105,24 +108,26 @@ class _ScaleCameraScreenState extends ConsumerState<ScaleCameraScreen> {
 
       final res = await ocrDio.post('/ocr/read-scale', data: formData);
       final data = (res.data['data'] ?? res.data) as Map<String, dynamic>;
-
-      try {
-        File(xFile.path).deleteSync();
-      } catch (_) {}
+      final valueGrams = (data['valueGrams'] as num).toDouble();
+      final evidencePath = await _stampEvidenceImage(
+        xFile.path,
+        valueGrams: valueGrams,
+        capturedAt: DateTime.now(),
+      );
 
       if (mounted) {
         setState(() {
           _result = OcrResult(
-            valueGrams: (data['valueGrams'] as num).toDouble(),
+            valueGrams: valueGrams,
             reading: data['reading'] as String,
             confidence: (data['confidence'] as num).toDouble(),
+            imagePath: evidencePath,
           );
           _scanning = false;
           _wakingUp = false;
         });
       }
     } on DioException catch (e) {
-<<<<<<< HEAD
       if (mounted) setState(() {
         final responseData = e.response?.data;
         final message = responseData is Map
@@ -134,17 +139,6 @@ class _ScaleCameraScreenState extends ConsumerState<ScaleCameraScreen> {
         _scanning = false;
         _wakingUp = false;
       });
-=======
-      if (mounted) {
-        setState(() {
-          _error = e.response?.statusCode == 422
-              ? 'Could not read digits — try better lighting or angle'
-              : 'Request timed out — tap Retry to try again';
-          _scanning = false;
-          _wakingUp = false;
-        });
-      }
->>>>>>> f60574dbe3e32db7ec2b0ae2557b810ad129e4d7
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -154,6 +148,47 @@ class _ScaleCameraScreenState extends ConsumerState<ScaleCameraScreen> {
         });
       }
     }
+  }
+
+  /// Embeds the recognised live reading and local capture time in the evidence
+  /// image. The backend separately records its own received-at timestamp.
+  Future<String> _stampEvidenceImage(
+    String imagePath, {
+    required double valueGrams,
+    required DateTime capturedAt,
+  }) async {
+    try {
+      final bytes = await File(imagePath).readAsBytes();
+      final image = img.decodeImage(bytes);
+      if (image == null) return imagePath;
+
+      String two(int value) => value.toString().padLeft(2, '0');
+      final stamp = '${capturedAt.year}-${two(capturedAt.month)}-${two(capturedAt.day)} '
+          '${two(capturedAt.hour)}:${two(capturedAt.minute)}:${two(capturedAt.second)}';
+      final label = 'LIVE SCALE: ${valueGrams.toStringAsFixed(3)} g  |  $stamp';
+      final barHeight = image.height < 800 ? 52 : 86;
+      img.fillRect(
+        image,
+        x1: 0,
+        y1: image.height - barHeight,
+        x2: image.width - 1,
+        y2: image.height - 1,
+        color: img.ColorRgba8(0, 0, 0, 220),
+      );
+      img.drawString(
+        image,
+        label,
+        font: image.height < 800 ? img.arial14 : img.arial24,
+        x: 16,
+        y: image.height - barHeight + (barHeight ~/ 3),
+        color: img.ColorRgba8(255, 215, 90, 255),
+      );
+      await File(imagePath).writeAsBytes(img.encodeJpg(image, quality: 92));
+    } catch (_) {
+      // A valid original capture is still stronger evidence than losing it
+      // because a device could not apply the visual stamp.
+    }
+    return imagePath;
   }
 
   void _confirm() {
@@ -247,7 +282,7 @@ class _ScaleCameraScreenState extends ConsumerState<ScaleCameraScreen> {
 class _TargetOverlayPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final dimPaint = Paint()..color = Colors.black.withValues(alpha: 0.45);
+    final dimPaint = Paint()..color = Colors.black.withOpacity(0.45);
     final targetRect = Rect.fromCenter(
       center: Offset(size.width / 2, size.height * 0.42),
       width: size.width * 0.75,
@@ -260,7 +295,7 @@ class _TargetOverlayPainter extends CustomPainter {
     canvas.drawRRect(
       RRect.fromRectAndRadius(targetRect, const Radius.circular(8)),
       Paint()
-        ..color = GoldCraftColors.jewelryGold.withValues(alpha: 0.8)
+        ..color = GoldCraftColors.jewelryGold.withOpacity(0.8)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2,
     );
@@ -381,7 +416,7 @@ class _ResultPanel extends StatelessWidget {
             color: const Color(0xFF2A2A2A),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: GoldCraftColors.jewelryGold.withValues(alpha: 0.4),
+              color: GoldCraftColors.jewelryGold.withOpacity(0.4),
             ),
           ),
           child: Column(children: [

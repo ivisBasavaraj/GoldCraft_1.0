@@ -29,16 +29,28 @@ class TreasurySummary {
 
 class DashboardSummary {
   final int totalKaragars;
+  final int totalJobs;
+  final Map<String, int> jobsByStatus;
   final double totalGoldIssuedGrams;
+  final double totalGoldReturnedGrams;
+  final double inCirculationGrams;
   final double totalAdvancePaidRupees;
+  final double outstandingAdvanceRupees;
   final double totalSalaryRupees;
+  final int pendingPayrollCount;
   final TreasurySummary treasury;
 
   const DashboardSummary({
     required this.totalKaragars,
+    required this.totalJobs,
+    required this.jobsByStatus,
     required this.totalGoldIssuedGrams,
+    required this.totalGoldReturnedGrams,
+    required this.inCirculationGrams,
     required this.totalAdvancePaidRupees,
+    required this.outstandingAdvanceRupees,
     required this.totalSalaryRupees,
+    required this.pendingPayrollCount,
     required this.treasury,
   });
 
@@ -47,21 +59,37 @@ class DashboardSummary {
     Map<String, dynamic> treasuryJson,
   ) {
     final gold = dashboard['gold'] as Map<String, dynamic>? ?? {};
+    final jobs = dashboard['jobs'] as Map<String, dynamic>? ?? {};
+    final rawStatuses = jobs['byStatus'] as Map<String, dynamic>? ?? {};
     final advances = dashboard['advances'] as Map<String, dynamic>? ?? {};
     final payroll = dashboard['payroll'] as Map<String, dynamic>? ?? {};
 
     return DashboardSummary(
       totalKaragars: dashboard['activeKaragars'] as int? ?? 0,
+      totalJobs: (jobs['total'] as num? ?? 0).toInt(),
+      jobsByStatus: rawStatuses.map(
+        (key, value) => MapEntry(key, (value as num? ?? 0).toInt()),
+      ),
       totalGoldIssuedGrams: (gold['totalIssuedGrams'] as num? ?? 0).toDouble(),
+      totalGoldReturnedGrams:
+          (gold['totalReturnedGrams'] as num? ?? 0).toDouble(),
+      inCirculationGrams:
+          (gold['inCirculationGrams'] as num? ?? 0).toDouble(),
       totalAdvancePaidRupees: (advances['totalPaidRupees'] as num?
               ?? advances['totalOutstandingRupees'] as num?
               ?? 0)
           .toDouble(),
+      outstandingAdvanceRupees:
+          (advances['totalOutstandingRupees'] as num? ?? 0).toDouble(),
       totalSalaryRupees: (payroll['totalPaidRupees'] as num?
               ?? payroll['totalNetPayableRupees'] as num?
               ?? dashboard['totalSalaryRupees'] as num?
               ?? 0)
           .toDouble(),
+      pendingPayrollCount: (payroll['pendingCount'] as num? ??
+              dashboard['pendingPayrolls'] as num? ??
+              0)
+          .toInt(),
       treasury: TreasurySummary.fromJson(treasuryJson),
     );
   }

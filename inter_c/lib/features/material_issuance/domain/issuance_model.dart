@@ -8,6 +8,10 @@ class MaterialIssuance {
   final double physicalWeightGrams;
   final bool reversed;
   final String? notes;
+  final double? managerOcrGrams;
+  final double? ocrConfidence;
+  final String? ocrImageUrl;
+  final DateTime? ocrCapturedAt;
   final DateTime createdAt;
 
   const MaterialIssuance({
@@ -20,6 +24,10 @@ class MaterialIssuance {
     required this.physicalWeightGrams,
     required this.reversed,
     this.notes,
+    this.managerOcrGrams,
+    this.ocrConfidence,
+    this.ocrImageUrl,
+    this.ocrCapturedAt,
     required this.createdAt,
   });
 
@@ -43,6 +51,12 @@ class MaterialIssuance {
           .toDouble(),
       reversed: json['reversed'] as bool? ?? false,
       notes: json['notes'] as String?,
+      managerOcrGrams: (json['managerOcrGrams'] as num?)?.toDouble(),
+      ocrConfidence: (json['ocrConfidence'] as num?)?.toDouble(),
+      ocrImageUrl: json['ocrImageUrl'] as String?,
+      ocrCapturedAt: json['ocrCapturedAt'] == null
+          ? null
+          : DateTime.tryParse(json['ocrCapturedAt'] as String)?.toLocal(),
       createdAt: DateTime.parse(json['createdAt'] as String),
     );
   }

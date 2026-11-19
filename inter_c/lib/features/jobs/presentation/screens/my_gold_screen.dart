@@ -39,6 +39,9 @@ class _MyGoldScreenState extends ConsumerState<MyGoldScreen>
     final jobsAsync = ref.watch(myJobsProvider);
     final issuancesAsync = ref.watch(myIssuancesProvider(null));
     final receiptsAsync = ref.watch(myReceiptsProvider(null));
+    final jobNamesById = {
+      for (final job in jobsAsync.valueOrNull ?? <Job>[]) job.id: job.title,
+    };
 
     return Scaffold(
       backgroundColor: GoldCraftColors.background,
@@ -101,7 +104,10 @@ class _MyGoldScreenState extends ConsumerState<MyGoldScreen>
                           )
                         : SingleChildScrollView(
                             padding: const EdgeInsets.all(16),
-                            child: _IssuedTable(items: filtered),
+                            child: _IssuedTable(
+                              items: filtered,
+                              jobNamesById: jobNamesById,
+                            ),
                           ),
                   ),
                 ],
@@ -139,12 +145,15 @@ class _MyGoldScreenState extends ConsumerState<MyGoldScreen>
                         items: items
                             .map((i) => _GoldRow(
                                   txId: i.transactionId,
+                                  jobId: i.jobId,
+                                  jobTitle: i.jobTitle,
                                   weightGrams: i.physicalWeightGrams,
                                   isDebit: false,
                                   dateTime: i.createdAt,
                                   type: i.receiptType,
                                 ))
                             .toList(),
+                        jobNamesById: jobNamesById,
                       ),
                     ),
                   ),
@@ -246,7 +255,8 @@ class _JobFilterDropdown extends StatelessWidget {
 
 class _IssuedTable extends StatelessWidget {
   final List items; // List<MaterialIssuance>
-  const _IssuedTable({required this.items});
+  final Map<String, String> jobNamesById;
+  const _IssuedTable({required this.items, required this.jobNamesById});
 
   @override
   Widget build(BuildContext context) {
@@ -286,6 +296,8 @@ class _IssuedTable extends StatelessWidget {
           rows: items.map((i) {
             final jobLabel = (i.jobTitle != null && i.jobTitle!.isNotEmpty)
                 ? i.jobTitle!
+                : jobNamesById[i.jobId]?.isNotEmpty == true
+                    ? jobNamesById[i.jobId]!
                 : i.jobId.length > 8
                     ? '${i.jobId.substring(0, 8)}…'
                     : i.jobId;
@@ -320,12 +332,16 @@ class _IssuedTable extends StatelessWidget {
 
 class _GoldRow {
   final String txId;
+  final String jobId;
+  final String? jobTitle;
   final double weightGrams;
   final bool isDebit;
   final DateTime dateTime;
   final String? type;
   const _GoldRow({
     required this.txId,
+    required this.jobId,
+    this.jobTitle,
     required this.weightGrams,
     required this.isDebit,
     required this.dateTime,
@@ -335,7 +351,8 @@ class _GoldRow {
 
 class _GoldTable extends StatelessWidget {
   final List<_GoldRow> items;
-  const _GoldTable({required this.items});
+  final Map<String, String> jobNamesById;
+  const _GoldTable({required this.items, required this.jobNamesById});
 
   @override
   Widget build(BuildContext context) {
@@ -368,6 +385,7 @@ class _GoldTable extends StatelessWidget {
           ),
           columns: [
             const DataColumn(label: Text('TX ID')),
+            const DataColumn(label: Text('JOB')),
             const DataColumn(label: Text('WEIGHT'), numeric: true),
             if (hasType) const DataColumn(label: Text('TYPE')),
             const DataColumn(label: Text('DATE')),
@@ -377,12 +395,22 @@ class _GoldTable extends StatelessWidget {
             final color = r.isDebit
                 ? GoldCraftColors.softAmberText
                 : GoldCraftColors.softGreenText;
+            final jobLabel = (r.jobTitle?.isNotEmpty ?? false)
+                ? r.jobTitle!
+                : jobNamesById[r.jobId]?.isNotEmpty == true
+                    ? jobNamesById[r.jobId]!
+                    : r.jobId.length > 8
+                        ? '${r.jobId.substring(0, 8)}…'
+                        : r.jobId;
             return DataRow(cells: [
               DataCell(Text(r.txId,
                   style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                       color: color))),
+              DataCell(Text(jobLabel,
+                  style: const TextStyle(
+                      fontSize: 11, color: GoldCraftColors.textSecondary))),
               DataCell(Text(
                 '${r.weightGrams.toStringAsFixed(3)} g',
                 style: const TextStyle(fontWeight: FontWeight.w700),

@@ -6,6 +6,16 @@ const Karagar = require('../models/Karagar');
 const { Treasury, TreasuryTx } = require('../models/Treasury');
 const { auth } = require('../middleware/auth');
 
+async function withJobTitles(items) {
+  const jobIds = [...new Set(items.map((item) => item.jobId.toString()))];
+  const jobs = await Job.find({ _id: { $in: jobIds } }).select('title').lean();
+  const titlesById = new Map(jobs.map((job) => [job._id.toString(), job.title]));
+  return items.map((item) => ({
+    ...(item.toObject ? item.toObject() : item),
+    jobTitle: titlesById.get(item.jobId.toString()) || null,
+  }));
+}
+
 // GET /material-receipts/my — karagar sees only their own records (karagarId from token)
 router.get('/my', auth, async (req, res) => {
   try {
@@ -15,7 +25,8 @@ router.get('/my', auth, async (req, res) => {
     const filter = { karagarId: req.user.karagarId };
     if (req.query.jobId) filter.jobId = req.query.jobId;
     const limit = parseInt(req.query.limit) || 100;
-    const items = await MaterialReceipt.find(filter).sort({ createdAt: -1 }).limit(limit);
+    const records = await MaterialReceipt.find(filter).sort({ createdAt: -1 }).limit(limit);
+    const items = await withJobTitles(records);
     res.json({ data: { items, total: items.length } });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -28,7 +39,8 @@ router.get('/', auth, async (req, res) => {
     const filter = {};
     if (req.query.jobId) filter.jobId = req.query.jobId;
     const limit = parseInt(req.query.limit) || 20;
-    const items = await MaterialReceipt.find(filter).sort({ createdAt: -1 }).limit(limit);
+    const records = await MaterialReceipt.find(filter).sort({ createdAt: -1 }).limit(limit);
+    const items = await withJobTitles(records);
     res.json({ data: { items, total: items.length } });
   } catch (err) {
     res.status(500).json({ message: err.message });
