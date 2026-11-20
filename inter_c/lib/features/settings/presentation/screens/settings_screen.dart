@@ -8,7 +8,9 @@ import '../../../../features/jobs/presentation/screens/karagar_home_screen.dart'
     show KaragarBottomNav;
 
 class SettingsScreen extends ConsumerWidget {
-  const SettingsScreen({super.key});
+  final String title;
+
+  const SettingsScreen({super.key, this.title = 'Settings'});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -16,7 +18,7 @@ class SettingsScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: GoldCraftColors.background,
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: Text(title)),
       bottomNavigationBar: user?.isKaragar == true
           ? const KaragarBottomNav(currentIndex: 3)
           : null,

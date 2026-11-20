@@ -12,7 +12,7 @@ class GcLoadingIndicator extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           const CircularProgressIndicator(
-            color: GoldCraftColors.jewelryGold,
+            color: GoldCraftColors.workshopGreen,
             strokeWidth: 3,
           ),
           if (message != null) ...[
@@ -123,10 +123,10 @@ class GcEmptyState extends StatelessWidget {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: GoldCraftColors.jewelryGoldLight,
+                color: GoldCraftColors.workshopGreenLight,
                 borderRadius: BorderRadius.circular(24),
               ),
-              child: Icon(icon, color: GoldCraftColors.jewelryGold, size: 40),
+              child: Icon(icon, color: GoldCraftColors.workshopGreen, size: 40),
             ),
             const SizedBox(height: 20),
             Text(

@@ -40,6 +40,11 @@ class _KaragarsScreenState extends ConsumerState<KaragarsScreen> {
     return Scaffold(
       backgroundColor: GoldCraftColors.background,
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          tooltip: 'Back to dashboard',
+          onPressed: () => context.go('/dashboard'),
+        ),
         title: const Text('Karagars'),
         actions: [
           IconButton(
