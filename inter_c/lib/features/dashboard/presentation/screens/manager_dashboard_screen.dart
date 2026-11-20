@@ -3,133 +3,871 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../data/dashboard_provider.dart';
-import '../../../../core/theme/colors.dart';
+import '../../../../shared/widgets/gc_states.dart';
 import '../../../../features/auth/domain/auth_provider.dart';
 import '../../../../features/treasury/domain/treasury_model.dart';
-import '../../../../shared/widgets/gc_states.dart';
 
-const _green = Color(0xFF087C66);
-const _ink = Color(0xFF15211D);
+// -----------------------------------------------------------------------------
+// Local palette for this screen (matches the new green / gold design)
+// -----------------------------------------------------------------------------
+class _C {
+  static const bg = Color(0xFFFBF8F3);
+  static const card = Colors.white;
+  static const ink = Color(0xFF0F2A1D);
+  static const muted = Color(0xFF6B7280);
+  static const greenDark = Color(0xFF0B4D32);
+  static const green = Color(0xFF117A4D);
+  static const greenTint = Color(0xFFE6F2EA);
+  static const gold = Color(0xFFE7B53A);
+  static const goldDark = Color(0xFFB7791F);
+  static const goldTint = Color(0xFFFBF0D9);
+  static const track = Color(0xFFE7ECE8);
+  static const border = Color(0xFFEDE8DF);
+}
+
+// -----------------------------------------------------------------------------
+// View-model for dashboard values displayed by this screen.
+// -----------------------------------------------------------------------------
+class _DashVm {
+  final double availableGold; // grams
+  final double inCirculation; // grams
+  final double reservePercent;
+  final double totalExpenses;
+  final int activeJobs;
+  final int assigned;
+  final int inProgress;
+  final int qualityCheck;
+  final int completed;
+  final int totalKaragars;
+  final int totalJobs;
+
+  const _DashVm({
+    required this.availableGold,
+    required this.inCirculation,
+    required this.reservePercent,
+    required this.totalExpenses,
+    required this.activeJobs,
+    required this.assigned,
+    required this.inProgress,
+    required this.qualityCheck,
+    required this.completed,
+    required this.totalKaragars,
+    required this.totalJobs,
+  });
+
+  factory _DashVm.from(DashboardSummary summary) => _DashVm(
+        availableGold: summary.treasury.availableGoldGrams,
+        inCirculation: summary.treasury.inCirculationGrams,
+        reservePercent: summary.treasury.reserveRemainingPercent,
+        totalExpenses: summary.totalExpensesRupees,
+        activeJobs: summary.activeJobs,
+        assigned: summary.assignedJobs,
+        inProgress: summary.inProgressJobs,
+        qualityCheck: summary.qualityCheckJobs,
+        completed: summary.completedJobs,
+        totalKaragars: summary.totalKaragars,
+        totalJobs: summary.totalJobs,
+      );
+}
 
 class ManagerDashboardScreen extends ConsumerWidget {
   const ManagerDashboardScreen({super.key});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final data = ref.watch(dashboardProvider);
+    final dashAsync = ref.watch(dashboardProvider);
     final user = ref.watch(authUserProvider).valueOrNull;
-    return Scaffold(backgroundColor: GoldCraftColors.warmIvory, bottomNavigationBar: const _Nav(), body: SafeArea(child: data.when(
-      loading: () => const GcLoadingIndicator(message: 'Preparing workspace...'),
-      error: (e, _) => GcErrorState(message: e.toString(), onRetry: () => ref.invalidate(dashboardProvider)),
-      data: (s) => RefreshIndicator(color: _green, onRefresh: () async => ref.invalidate(dashboardProvider), child: LayoutBuilder(builder: (context, box) {
-        final desktop = box.maxWidth >= 1200;
-        final tablet = box.maxWidth >= 700;
-        final panels = [_Workshop(s: s), _Overview(s: s, name: user?.name), _Operations(s: s, admin: user?.isAdmin == true)];
-        return SingleChildScrollView(physics: const AlwaysScrollableScrollPhysics(), padding: EdgeInsets.all(desktop ? 32 : 18), child: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 1400), child: desktop ? IntrinsicHeight(child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [Expanded(flex: 4, child: panels[0]), const SizedBox(width: 22), Expanded(flex: 5, child: panels[1]), const SizedBox(width: 22), Expanded(flex: 4, child: panels[2])])) : tablet ? Column(children: [panels[1], const SizedBox(height: 18), Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: panels[2]), const SizedBox(width: 18), Expanded(child: panels[0])])]) : Column(children: [panels[1], const SizedBox(height: 18), panels[2], const SizedBox(height: 18), panels[0]]))),
-        );
-      })),
-    )));
-  }
-}
+    final name = user?.name.trim();
+    final greeting = name?.isNotEmpty == true ? 'Welcome, $name' : 'Welcome';
 
-class _Panel extends StatelessWidget { final Widget child; const _Panel(this.child); @override Widget build(BuildContext c) => Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: const Color(0xFFFFFEFB), borderRadius: BorderRadius.circular(30), border: Border.all(color: const Color(0xFFECE8DE)), boxShadow: const [BoxShadow(color: Color(0x120E231B), blurRadius: 28, offset: Offset(0,12))]), child: child); }
-class _Head extends StatelessWidget { final String title, caption; const _Head(this.title,this.caption); @override Widget build(BuildContext c) => Row(children:[Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(caption,style:const TextStyle(fontSize:10,color:GoldCraftColors.textSecondary)),const SizedBox(height:3),Text(title,style:const TextStyle(fontSize:21,fontWeight:FontWeight.w800,color:_ink))])),Container(width:36,height:36,decoration:const BoxDecoration(color:Color(0xFFF5F3ED),shape:BoxShape.circle),child:const Icon(Icons.notifications_none_rounded,size:18))]); }
-
-class _Overview extends StatelessWidget { final DashboardSummary s; final String? name; const _Overview({required this.s,this.name}); @override Widget build(BuildContext c) => _Panel(Column(crossAxisAlignment:CrossAxisAlignment.start,children:[_Head('Overview','${DateFormat('EEE, d MMM').format(DateTime.now())} · ${name ?? 'GoldCraft'}'),const SizedBox(height:18),_Gold(t:s.treasury),const SizedBox(height:12),Row(children:[Expanded(child:_Stat('Active jobs','${_active(s)}',Icons.precision_manufacturing_outlined,'/jobs')),const SizedBox(width:12),Expanded(child:_Stat('Payroll queue','${s.pendingPayrollCount}',Icons.payments_outlined,'/payroll'))]),const SizedBox(height:12),_Pulse(s),const SizedBox(height:14),const _Dock()])); }
-class _Gold extends StatelessWidget { final TreasurySummary t; const _Gold({required this.t}); @override Widget build(BuildContext c)=>InkWell(onTap:()=>c.push('/treasury'),borderRadius:BorderRadius.circular(22),child:Container(height:190,padding:const EdgeInsets.all(20),decoration:BoxDecoration(color:_green,borderRadius:BorderRadius.circular(22)),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Row(children:[const Text('Available gold',style:TextStyle(color:Colors.white70,fontSize:11)),const Spacer(),Container(padding:const EdgeInsets.symmetric(horizontal:8,vertical:4),decoration:BoxDecoration(color:Colors.white.withOpacity(.15),borderRadius:BorderRadius.circular(12)),child:const Text('LIVE',style:TextStyle(color:Colors.white,fontSize:9,fontWeight:FontWeight.w800)))]),const SizedBox(height:7),Text('${t.availableGoldGrams.toStringAsFixed(3)} g',style:const TextStyle(color:Colors.white,fontSize:31,fontWeight:FontWeight.w800)),const Text('Ready for controlled issue',style:TextStyle(color:Colors.white70,fontSize:11)),const Spacer(),Row(children:[_Fact('In circulation','${t.inCirculationGrams.toStringAsFixed(3)} g'),const SizedBox(width:25),_Fact('Reserve available','${t.reserveRemainingPercent.toStringAsFixed(1)}%')])]))); }
-class _Fact extends StatelessWidget { final String a,b; const _Fact(this.a,this.b); @override Widget build(BuildContext c)=>Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(a,style:const TextStyle(color:Colors.white54,fontSize:9)),Text(b,style:const TextStyle(color:Colors.white,fontSize:11,fontWeight:FontWeight.w700))]); }
-class _Stat extends StatelessWidget { final String a,b,r; final IconData i; const _Stat(this.a,this.b,this.i,this.r); @override Widget build(BuildContext c)=>InkWell(onTap:()=>c.push(r),borderRadius:BorderRadius.circular(17),child:Container(padding:const EdgeInsets.all(14),decoration:BoxDecoration(color:const Color(0xFFF8F7F2),borderRadius:BorderRadius.circular(17),border:Border.all(color:GoldCraftColors.divider)),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Icon(i,size:18,color:_green),const SizedBox(height:9),Text(b,style:const TextStyle(fontSize:19,fontWeight:FontWeight.w800,color:_ink)),Text(a,style:const TextStyle(fontSize:10,color:GoldCraftColors.textSecondary))]))); }
-class _Pulse extends StatelessWidget { final DashboardSummary s; const _Pulse(this.s); @override Widget build(BuildContext c){final rows=[('Assigned','assigned',const Color(0xFF8CAFA5)),('In progress','inProgress',_green),('Quality check','qualityCheck',GoldCraftColors.jewelryGold),('Completed','completed',GoldCraftColors.softGreenText)]; final max=rows.map((x)=>s.jobsByStatus[x.$2]??0).fold(1,(a,b)=>a>b?a:b); return InkWell(onTap:()=>c.push('/jobs'),child:Container(padding:const EdgeInsets.all(15),decoration:BoxDecoration(border:Border.all(color:GoldCraftColors.divider),borderRadius:BorderRadius.circular(18)),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('Production pulse',style:TextStyle(fontSize:12,fontWeight:FontWeight.w800)),const SizedBox(height:12),for(final x in rows) Padding(padding:const EdgeInsets.only(bottom:8),child:Row(children:[SizedBox(width:76,child:Text(x.$1,style:const TextStyle(fontSize:10,color:GoldCraftColors.textSecondary))),Expanded(child:LinearProgressIndicator(value:(s.jobsByStatus[x.$2]??0)/max,minHeight:7,color:x.$3,backgroundColor:x.$3.withOpacity(.12))),const SizedBox(width:9),Text('${s.jobsByStatus[x.$2]??0}',style:const TextStyle(fontWeight:FontWeight.w800,fontSize:11))]))])));}}
-class _Dock extends StatelessWidget {
-  const _Dock();
-
-  @override
-  Widget build(BuildContext context) {
-    final items = [
-      (Icons.dashboard_rounded, 'Overview', '/dashboard'),
-      (Icons.scale_outlined, 'Issue', '/material-issuance/new'),
-      (Icons.assignment_return_outlined, 'Receive', '/material-receipts/new'),
-      (Icons.more_horiz_rounded, 'More', '/reports'),
-    ];
-
-    return Container(
-      padding: const EdgeInsets.all(5),
-      decoration: BoxDecoration(
-        color: _ink,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          for (final item in items)
-            Expanded(
-              child: InkWell(
-                onTap: () => context.go(item.$3),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 9),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
+    return Scaffold(
+      backgroundColor: _C.bg,
+      body: SafeArea(
+        bottom: false,
+        child: dashAsync.when(
+          loading: () =>
+              const GcLoadingIndicator(message: 'Loading dashboard...'),
+          error: (e, _) => GcErrorState(
+            message: e.toString(),
+            onRetry: () => ref.invalidate(dashboardProvider),
+          ),
+          data: (summary) {
+            final vm = _DashVm.from(summary);
+            return RefreshIndicator(
+              color: _C.green,
+              onRefresh: () async => ref.invalidate(dashboardProvider),
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                children: [
+                  _Header(
+                    greeting: greeting,
+                    unreadCount: 0,
+                    onProfile: () => context.push('/profile'),
+                    onBell: () => context.push('/notifications'),
+                  ),
+                  const SizedBox(height: 16),
+                  _GoldHeroCard(vm: vm),
+                  const SizedBox(height: 14),
+                  Row(
                     children: [
-                      Icon(
-                        item.$1,
-                        size: 17,
-                        color: item.$2 == 'Overview'
-                            ? Colors.white
-                            : Colors.white54,
+                      Expanded(
+                        child: _StatTile(
+                          value: vm.activeJobs.toString(),
+                          label: 'Active Jobs',
+                          icon: Icons.work_outline_rounded,
+                          fg: _C.green,
+                          bg: _C.greenTint,
+                          onTap: () => context.push('/jobs'),
+                        ),
                       ),
-                      Text(
-                        item.$2,
-                        style: TextStyle(
-                          fontSize: 9,
-                          color: item.$2 == 'Overview'
-                              ? Colors.white
-                              : Colors.white54,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _StatTile(
+                          value: NumberFormat.currency(
+                            locale: 'en_IN',
+                            symbol: '₹',
+                            decimalDigits: 0,
+                          ).format(vm.totalExpenses),
+                          label: 'Total Expenses',
+                          icon: Icons.receipt_long_outlined,
+                          fg: _C.goldDark,
+                          bg: _C.goldTint,
+                          onTap: () => context.push('/reports'),
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 14),
+                  _ProductionPulseCard(vm: vm),
+                  const SizedBox(height: 14),
+                  _WorkshopCard(
+                    vm: vm,
+                    onViewAll: () => context.push('/karagars'),
+                    onFollowUps: () => context.push('/jobs'),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+      bottomNavigationBar: const _ManagerBottomNav(currentIndex: 0),
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Header
+// -----------------------------------------------------------------------------
+class _Header extends StatelessWidget {
+  final String greeting;
+  final int unreadCount;
+  final VoidCallback onBell;
+  final VoidCallback onProfile;
+  const _Header({
+    required this.greeting,
+    this.unreadCount = 0,
+    required this.onBell,
+    required this.onProfile,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                greeting,
+                style: const TextStyle(fontSize: 15, color: _C.muted),
+              ),
+              const SizedBox(height: 2),
+              const Text(
+                'Dashboard',
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w800,
+                  color: _C.ink,
+                  height: 1.15,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                width: 36,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: _C.greenDark,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _HeaderActionButton(
+              icon: Icons.person_outline_rounded,
+              tooltip: 'Profile',
+              onPressed: onProfile,
+            ),
+            const SizedBox(width: 8),
+            _HeaderActionButton(
+              icon: Icons.notifications_none_rounded,
+              tooltip: 'Notifications',
+              onPressed: onBell,
+              showBadge: unreadCount > 0,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _HeaderActionButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+  final bool showBadge;
+
+  const _HeaderActionButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+    this.showBadge = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: SizedBox.square(
+        dimension: 48,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Material(
+              color: Colors.white,
+              shape: const CircleBorder(),
+              elevation: 2,
+              shadowColor: Colors.black12,
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: onPressed,
+                child: SizedBox.square(
+                  dimension: 48,
+                  child: Icon(icon, color: _C.ink, size: 24),
                 ),
               ),
             ),
+            if (showBadge)
+              Positioned(
+                right: 2,
+                top: 2,
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 1.5),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Hero: Available Gold
+// -----------------------------------------------------------------------------
+class _GoldHeroCard extends StatelessWidget {
+  final _DashVm vm;
+  const _GoldHeroCard({required this.vm});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF0E6B43), Color(0xFF083D28)],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: _C.greenDark.withValues(alpha: 0.25),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          // Decorative gold bars (replace with an Image.asset if you have one)
+          Positioned(
+            right: 4,
+            top: 18,
+            child: Icon(
+              Icons.layers_rounded,
+              size: 96,
+              color: _C.gold.withValues(alpha: 0.9),
+            ),
+          ),
+          Positioned(
+            right: 0,
+            top: 0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.circle, size: 9, color: Color(0xFF4ADE80)),
+                  SizedBox(width: 6),
+                  Text('LIVE',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withValues(alpha: 0.1),
+                      border: Border.all(color: _C.gold, width: 1.5),
+                    ),
+                    child: const Icon(Icons.layers_rounded,
+                        color: _C.gold, size: 32),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Available Gold',
+                            style:
+                                TextStyle(color: Colors.white, fontSize: 16)),
+                        const SizedBox(height: 2),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            '${vm.availableGold.toStringAsFixed(3)} g',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 36,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 80), // room for the decorative bars
+                ],
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.white, size: 20),
+                    SizedBox(width: 8),
+                    Text('Ready for controlled issue',
+                        style: TextStyle(color: Colors.white, fontSize: 13)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: _HeroStat(
+                      icon: Icons.sync_rounded,
+                      label: 'In Circulation',
+                      value: '${vm.inCirculation.toStringAsFixed(3)} g',
+                    ),
+                  ),
+                  Container(
+                      width: 1,
+                      height: 36,
+                      color: Colors.white.withValues(alpha: 0.3)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _HeroStat(
+                      icon: Icons.storage_rounded,
+                      label: 'Reserve Available',
+                      value: '${vm.reservePercent.toStringAsFixed(1)}%',
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-class _Workshop extends StatelessWidget { final DashboardSummary s; const _Workshop({required this.s}); @override Widget build(BuildContext c)=>_Panel(Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const _Head('Workshop','GoldCraft production floor'),const SizedBox(height:18),Container(padding:const EdgeInsets.symmetric(horizontal:12,vertical:10),decoration:BoxDecoration(color:const Color(0xFFEAF4F0),borderRadius:BorderRadius.circular(14)),child:const Row(children:[Icon(Icons.circle,size:9,color:_green),SizedBox(width:8),Text('Live workshop status',style:TextStyle(fontSize:11,fontWeight:FontWeight.w700,color:_green)),Spacer(),Text('Updated now',style:TextStyle(fontSize:10,color:GoldCraftColors.textSecondary))])),const SizedBox(height:14),Container(padding:const EdgeInsets.all(16),decoration:BoxDecoration(color:_green,borderRadius:BorderRadius.circular(20)),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('Active workshop',style:TextStyle(color:Colors.white70,fontSize:10)),Text('${s.totalKaragars} karagars',style:const TextStyle(color:Colors.white,fontWeight:FontWeight.w800,fontSize:25)),Text('${_active(s)} active jobs · ${s.totalJobs} total ledger',style:const TextStyle(color:Colors.white70,fontSize:10))])),const SizedBox(height:18),const Text('Production queue',style:TextStyle(fontWeight:FontWeight.w800,fontSize:13)),_Row(Icons.schedule_outlined,s.jobsByStatus['assigned']??0,'Awaiting work start',GoldCraftColors.softBlueText,'/jobs'),_Row(Icons.handyman_outlined,s.jobsByStatus['inProgress']??0,'Currently in production',_green,'/jobs'),_Row(Icons.fact_check_outlined,s.jobsByStatus['qualityCheck']??0,'Waiting for quality check',GoldCraftColors.jewelryGoldDark,'/jobs'),const Spacer(),TextButton.icon(onPressed:()=>c.push('/karagars'),icon:const Icon(Icons.groups_2_outlined),label:const Text('View workshop team'),style:TextButton.styleFrom(foregroundColor:_green))]));}
-class _Row extends StatelessWidget {final IconData i;final int n;final String a,r;final Color color;const _Row(this.i,this.n,this.a,this.color,this.r);@override Widget build(BuildContext c)=>InkWell(onTap:()=>c.push(r),child:Padding(padding:const EdgeInsets.symmetric(vertical:10),child:Row(children:[Container(width:32,height:32,decoration:BoxDecoration(color:color.withOpacity(.12),borderRadius:BorderRadius.circular(10)),child:Icon(i,size:16,color:color)),const SizedBox(width:10),Expanded(child:Text(a,style:const TextStyle(fontSize:11,fontWeight:FontWeight.w600))),Text('$n',style:const TextStyle(fontSize:15,fontWeight:FontWeight.w800))])));}
-class _Operations extends StatelessWidget {final DashboardSummary s;final bool admin;const _Operations({required this.s,required this.admin});@override Widget build(BuildContext c){final attention=(s.jobsByStatus['assigned']??0)+(s.jobsByStatus['qualityCheck']??0)+s.pendingPayrollCount;return _Panel(Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const _Head('Operations','Material and finance controls'),const SizedBox(height:18),InkWell(onTap:()=>c.push('/jobs'),child:Container(padding:const EdgeInsets.all(17),decoration:BoxDecoration(color:const Color(0xFFF4EEE2),borderRadius:BorderRadius.circular(20)),child:Row(children:[const CircleAvatar(backgroundColor:GoldCraftColors.jewelryGold,child:Icon(Icons.priority_high,color:Colors.white)),const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('Needs attention',style:TextStyle(fontSize:10,color:GoldCraftColors.textSecondary)),Text('$attention follow-ups',style:const TextStyle(fontWeight:FontWeight.w800,fontSize:19)),const Text('Review before next issue cycle',style:TextStyle(fontSize:10,color:GoldCraftColors.textSecondary))])),const Icon(Icons.arrow_forward,color:GoldCraftColors.jewelryGoldDark)]))),const SizedBox(height:12),Row(children:[Expanded(child:_Stat('In circulation','${s.inCirculationGrams.toStringAsFixed(3)} g',Icons.sync_alt_rounded,'/material-issuance')),const SizedBox(width:12),Expanded(child:_Stat('Returned gold','${s.totalGoldReturnedGrams.toStringAsFixed(3)} g',Icons.keyboard_return_rounded,'/treasury'))]),const SizedBox(height:12),_Stat('Outstanding advances','₹${s.outstandingAdvanceRupees.toStringAsFixed(0)}',Icons.account_balance_wallet_outlined,'/advances'),const SizedBox(height:18),const Text('Action queue',style:TextStyle(fontWeight:FontWeight.w800,fontSize:13)),_Row(Icons.payments_outlined,s.pendingPayrollCount,'Payroll records awaiting action',GoldCraftColors.softRedText,'/payroll'),_Row(Icons.play_circle_outline,s.jobsByStatus['assigned']??0,'Jobs requiring verification',GoldCraftColors.softBlueText,'/jobs'),_Row(Icons.verified_user_outlined,s.jobsByStatus['qualityCheck']??0,'Quality check follow-ups',GoldCraftColors.jewelryGoldDark,'/jobs'),if(admin)...[const Divider(),_Row(Icons.manage_accounts_outlined,0,'Manage team access',_green,'/users'),_Row(Icons.settings_outlined,0,'Workspace settings',GoldCraftColors.textSecondary,'/settings')]]));}}
-int _active(DashboardSummary s)=>(s.jobsByStatus['assigned']??0)+(s.jobsByStatus['inProgress']??0)+(s.jobsByStatus['qualityCheck']??0);
-class _Nav extends StatelessWidget {
-  const _Nav();
+class _HeroStat extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _HeroStat(
+      {required this.icon, required this.label, required this.value});
 
   @override
-  Widget build(BuildContext context) => BottomNavigationBar(
-        currentIndex: 0,
-        onTap: (index) {
-          const routes = ['/dashboard', '/karagars', '/jobs', '/treasury', '/reports'];
-          if (index != 0) context.go(routes[index]);
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard_outlined),
-            label: 'Dashboard',
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.white70, size: 30),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 12)),
+              Text(value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700)),
+            ],
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.people_outline),
-            label: 'Karagars',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.work_outline),
-            label: 'Jobs',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.account_balance_outlined),
-            label: 'Treasury',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart_outlined),
-            label: 'Reports',
+        ),
+      ],
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Active Jobs / Payroll Queue tiles
+// -----------------------------------------------------------------------------
+class _StatTile extends StatelessWidget {
+  final String value;
+  final String label;
+  final IconData icon;
+  final Color fg;
+  final Color bg;
+  final VoidCallback onTap;
+  const _StatTile({
+    required this.value,
+    required this.label,
+    required this.icon,
+    required this.fg,
+    required this.bg,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: _C.border),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: fg, size: 38),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(value,
+                        maxLines: 1,
+                        style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: _C.ink,
+                            height: 1.1)),
+                  ),
+                  Text(label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 14, color: _C.ink)),
+                ],
+              ),
+            ),
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: fg.withValues(alpha: 0.18),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.arrow_forward_rounded, color: fg, size: 20),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Production Pulse
+// -----------------------------------------------------------------------------
+class _ProductionPulseCard extends StatelessWidget {
+  final _DashVm vm;
+  const _ProductionPulseCard({required this.vm});
+
+  @override
+  Widget build(BuildContext context) {
+    final maxCount = [vm.assigned, vm.inProgress, vm.qualityCheck, vm.completed]
+        .reduce((a, b) => a > b ? a : b);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _C.card,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: _C.border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F000000),
+            blurRadius: 10,
+            offset: Offset(0, 4),
           ),
         ],
-      );
+      ),
+      child: Column(
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.monitor_heart_outlined,
+                  color: _C.greenDark, size: 28),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text('Production Pulse',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: _C.ink)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _PulseRow('Assigned', vm.assigned, maxCount, const Color(0xFF8DB8A0)),
+          _PulseRow('In Progress', vm.inProgress, maxCount, _C.green),
+          _PulseRow('Quality Check', vm.qualityCheck, maxCount, _C.gold),
+          _PulseRow('Completed', vm.completed, maxCount, _C.green),
+        ],
+      ),
+    );
+  }
+}
+
+class _PulseRow extends StatelessWidget {
+  final String label;
+  final int count;
+  final int maxCount;
+  final Color color;
+  const _PulseRow(this.label, this.count, this.maxCount, this.color);
+
+  @override
+  Widget build(BuildContext context) {
+    final fraction = maxCount == 0 ? 0.0 : count / maxCount;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(label,
+                style: const TextStyle(fontSize: 14, color: _C.ink)),
+          ),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Stack(
+                children: [
+                  Container(height: 10, color: _C.track),
+                  FractionallySizedBox(
+                    widthFactor: fraction.clamp(0.0, 1.0),
+                    child: Container(height: 10, color: color),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 28,
+            child: Text('$count',
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w700, color: _C.ink)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Workshop & Operations
+// -----------------------------------------------------------------------------
+class _WorkshopCard extends StatelessWidget {
+  final _DashVm vm;
+  final VoidCallback onViewAll;
+  final VoidCallback onFollowUps;
+  const _WorkshopCard({
+    required this.vm,
+    required this.onViewAll,
+    required this.onFollowUps,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _C.greenTint.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: _C.border),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.settings_outlined,
+                  color: _C.greenDark, size: 28),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text('Workshop & Operations',
+                    style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: _C.ink)),
+              ),
+              GestureDetector(
+                onTap: onViewAll,
+                child: const Row(
+                  children: [
+                    Text('View All',
+                        style: TextStyle(
+                            color: _C.green,
+                            fontWeight: FontWeight.w700,
+                            decoration: TextDecoration.underline)),
+                    SizedBox(width: 4),
+                    Icon(Icons.arrow_forward_rounded,
+                        color: _C.green, size: 18),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          IntrinsicHeight(
+            child: Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: const BoxDecoration(
+                            color: Color(0xFFD5E8DB), shape: BoxShape.circle),
+                        child: const Icon(Icons.groups_rounded,
+                            color: _C.greenDark, size: 30),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Live workshop status',
+                                style:
+                                    TextStyle(fontSize: 12, color: _C.muted)),
+                            Text('${vm.totalKaragars} karagars',
+                                style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                    color: _C.ink)),
+                            Text(
+                                '${vm.activeJobs} active jobs • ${vm.totalJobs} total ledger',
+                                style: const TextStyle(
+                                    fontSize: 11, color: _C.muted)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const VerticalDivider(width: 20, color: _C.border),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: onFollowUps,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: const BoxDecoration(
+                              color: _C.goldDark, shape: BoxShape.circle),
+                          child: const Icon(Icons.priority_high_rounded,
+                              color: Colors.white, size: 30),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Quality check',
+                                  style:
+                                      TextStyle(fontSize: 12, color: _C.muted)),
+                              Text('${vm.qualityCheck} jobs',
+                                  style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                      color: _C.ink)),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.arrow_forward_rounded,
+                            color: _C.green, size: 20),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Bottom navigation (pill-style selected tab)
+// -----------------------------------------------------------------------------
+class _ManagerBottomNav extends StatelessWidget {
+  final int currentIndex;
+  const _ManagerBottomNav({required this.currentIndex});
+
+  static const _routes = [
+    '/dashboard',
+    '/karagars',
+    '/jobs',
+    '/treasury',
+    '/reports',
+  ];
+
+  static const _items = [
+    (Icons.dashboard_outlined, Icons.dashboard_rounded, 'Dashboard'),
+    (Icons.people_outline, Icons.people_rounded, 'Karagars'),
+    (Icons.work_outline_rounded, Icons.work_rounded, 'Jobs'),
+    (Icons.account_balance_outlined, Icons.account_balance_rounded, 'Treasury'),
+    (Icons.bar_chart_outlined, Icons.bar_chart_rounded, 'Reports'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(32),
+          border: Border.all(color: _C.border),
+          boxShadow: const [
+            BoxShadow(
+                color: Color(0x14000000), blurRadius: 12, offset: Offset(0, 4)),
+          ],
+        ),
+        child: Row(
+          children: [
+            for (int i = 0; i < _items.length; i++)
+              i == currentIndex
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: _C.greenDark,
+                        borderRadius: BorderRadius.circular(28),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(_items[i].$2, color: Colors.white, size: 24),
+                          const SizedBox(height: 2),
+                          Text(_items[i].$3,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    )
+                  : Expanded(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(28),
+                        onTap: () => context.go(_routes[i]),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(_items[i].$1, color: _C.muted, size: 24),
+                              const SizedBox(height: 2),
+                              Text(_items[i].$3,
+                                  style: const TextStyle(
+                                      color: _C.muted, fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+          ],
+        ),
+      ),
+    );
+  }
 }

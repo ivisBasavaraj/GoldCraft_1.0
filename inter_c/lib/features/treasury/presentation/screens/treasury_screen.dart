@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
 import '../../data/treasury_provider.dart';
@@ -58,7 +59,14 @@ class TreasuryScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: GoldCraftColors.background,
-      appBar: AppBar(title: const Text('Treasury Vault')),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          tooltip: 'Back to dashboard',
+          onPressed: () => context.go('/dashboard'),
+        ),
+        title: const Text('Treasury Vault'),
+      ),
       body: summaryAsync.when(
         loading: () => const GcLoadingIndicator(message: 'Loading treasury...'),
         error: (e, _) => GcErrorState(
@@ -66,7 +74,7 @@ class TreasuryScreen extends ConsumerWidget {
           onRetry: () => ref.invalidate(treasurySummaryProvider),
         ),
         data: (summary) => RefreshIndicator(
-          color: GoldCraftColors.jewelryGold,
+          color: GoldCraftColors.workshopGreen,
           onRefresh: () async {
             ref.invalidate(treasurySummaryProvider);
             ref.invalidate(treasuryTransactionsProvider(1));
@@ -80,7 +88,10 @@ class TreasuryScreen extends ConsumerWidget {
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF2C1F0A), Color(0xFF4A3218)],
+                    colors: [
+                      GoldCraftColors.workshopGreenDark,
+                      GoldCraftColors.workshopGreen,
+                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -119,10 +130,10 @@ class TreasuryScreen extends ConsumerWidget {
                             '${summary.openingReserveGrams.toStringAsFixed(1)} g'),
                         _vaultStat('Issued',
                             '${summary.issuedGoldGrams.toStringAsFixed(1)} g',
-                            color: const Color(0xFFFFB74D)),
+                            color: GoldCraftColors.jewelryGoldLight),
                         _vaultStat('In Circulation',
                             '${summary.inCirculationGrams.toStringAsFixed(1)} g',
-                            color: const Color(0xFFEF9A9A)),
+                            color: Colors.white),
                       ],
                     ),
                   ],
@@ -138,7 +149,7 @@ class TreasuryScreen extends ConsumerWidget {
                       label: 'Add Gold',
                       icon: Icons.add_circle_outline_rounded,
                       filled: true,
-                      color: GoldCraftColors.softGreenText,
+                      color: GoldCraftColors.workshopGreen,
                       onTap: () => _openAdjustSheet(
                         context,
                         isAdd: true,
@@ -221,7 +232,7 @@ class TreasuryScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(label,
-                style: const TextStyle(fontSize: 11, color: Colors.white38)),
+                style: const TextStyle(fontSize: 11, color: Colors.white70)),
             const SizedBox(height: 4),
             Text(value,
                 style: TextStyle(

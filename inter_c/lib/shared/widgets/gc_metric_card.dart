@@ -16,8 +16,8 @@ class GcMetricCard extends StatelessWidget {
     required this.value,
     this.subtitle,
     required this.icon,
-    this.iconColor = GoldCraftColors.jewelryGold,
-    this.iconBg = GoldCraftColors.jewelryGoldLight,
+    this.iconColor = GoldCraftColors.workshopGreen,
+    this.iconBg = GoldCraftColors.workshopGreenLight,
     this.onTap,
   });
 
@@ -29,7 +29,7 @@ class GcMetricCard extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: GoldCraftColors.pureWhite,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(color: GoldCraftColors.divider),
           boxShadow: const [
             BoxShadow(

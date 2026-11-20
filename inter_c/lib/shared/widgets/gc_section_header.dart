@@ -39,7 +39,7 @@ class GcSectionHeader extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: GoldCraftColors.jewelryGold,
+                color: GoldCraftColors.workshopGreen,
               ),
             ),
           ),

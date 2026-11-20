@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/theme/colors.dart';
@@ -39,6 +40,11 @@ class ReportsScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: GoldCraftColors.background,
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          tooltip: 'Back to dashboard',
+          onPressed: () => context.go('/dashboard'),
+        ),
         title: const Text('Reports'),
       ),
       body: RefreshIndicator(

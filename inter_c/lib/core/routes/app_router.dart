@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/domain/auth_provider.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/dashboard/presentation/screens/manager_dashboard_screen.dart';
+import '../../features/notifications/presentation/screens/notifications_screen.dart';
 import '../../features/jobs/presentation/screens/karagar_home_screen.dart';
 import '../../features/jobs/presentation/screens/jobs_screen.dart';
 import '../../features/jobs/presentation/screens/assign_job_screen.dart';
@@ -47,28 +48,58 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
+      GoRoute(
+        path: '/notifications',
+        builder: (_, __) => const NotificationsScreen(),
+      ),
 
       // ── Manager routes ──────────────────────────────────────────
       GoRoute(
         path: '/dashboard',
-        builder: (_, __) => const _ExitWrapper(child: ManagerDashboardScreen()),
+        builder: (_, __) => const _ExitWrapper(
+          homeRoute: '/dashboard',
+          showExitDialog: true,
+          child: ManagerDashboardScreen(),
+        ),
       ),
-      GoRoute(path: '/karagars', builder: (_, __) => const _ExitWrapper(child: KaragarsScreen())),
-      GoRoute(path: '/karagars/new', builder: (_, __) => const AddKaragarScreen()),
+      GoRoute(
+        path: '/karagars',
+        builder: (_, __) => const _ExitWrapper(
+          homeRoute: '/dashboard',
+          child: KaragarsScreen(),
+        ),
+      ),
+      GoRoute(
+          path: '/karagars/new', builder: (_, __) => const AddKaragarScreen()),
       GoRoute(
         path: '/karagars/:id',
-        builder: (_, s) => KaragarProfileScreen(karagarId: s.pathParameters['id']!),
+        builder: (_, s) =>
+            KaragarProfileScreen(karagarId: s.pathParameters['id']!),
       ),
-      GoRoute(path: '/jobs', builder: (_, __) => const _ExitWrapper(child: JobsScreen())),
-      GoRoute(path: '/jobs/new', builder: (_, s) => AssignJobScreen(
-        preselectedKaragarId: s.uri.queryParameters['karagarId'],
-        preselectedKaragarName: s.uri.queryParameters['karagarName'],
-      )),
+      GoRoute(
+        path: '/jobs',
+        builder: (_, __) => const _ExitWrapper(
+          homeRoute: '/dashboard',
+          child: JobsScreen(),
+        ),
+      ),
+      GoRoute(
+          path: '/jobs/new',
+          builder: (_, s) => AssignJobScreen(
+                preselectedKaragarId: s.uri.queryParameters['karagarId'],
+                preselectedKaragarName: s.uri.queryParameters['karagarName'],
+              )),
       GoRoute(
         path: '/jobs/:id',
         builder: (_, s) => JobDetailScreen(jobId: s.pathParameters['id']!),
       ),
-      GoRoute(path: '/treasury', builder: (_, __) => const _ExitWrapper(child: TreasuryScreen())),
+      GoRoute(
+        path: '/treasury',
+        builder: (_, __) => const _ExitWrapper(
+          homeRoute: '/dashboard',
+          child: TreasuryScreen(),
+        ),
+      ),
       GoRoute(
         path: '/material-issuance',
         builder: (_, __) => const IssueGoldScreen(),
@@ -85,23 +116,71 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           initialJobId: s.uri.queryParameters['jobId'],
         ),
       ),
-      GoRoute(path: '/advances', builder: (_, __) => const _ExitWrapper(child: AdvancesScreen())),
-      GoRoute(path: '/advances/new', builder: (_, __) => const NewAdvanceScreen()),
-      GoRoute(path: '/payroll', builder: (_, __) => const _ExitWrapper(child: PayrollScreen())),
+      GoRoute(
+        path: '/advances',
+        builder: (_, __) => const _ExitWrapper(
+          homeRoute: '/dashboard',
+          child: AdvancesScreen(),
+        ),
+      ),
+      GoRoute(
+          path: '/advances/new', builder: (_, __) => const NewAdvanceScreen()),
+      GoRoute(
+        path: '/payroll',
+        builder: (_, __) => const _ExitWrapper(
+          homeRoute: '/dashboard',
+          child: PayrollScreen(),
+        ),
+      ),
       GoRoute(
         path: '/payroll/:id',
-        builder: (_, s) => PayrollDetailScreen(payrollId: s.pathParameters['id']!),
+        builder: (_, s) =>
+            PayrollDetailScreen(payrollId: s.pathParameters['id']!),
       ),
-      GoRoute(path: '/reports', builder: (_, __) => const _ExitWrapper(child: ReportsScreen())),
+      GoRoute(
+        path: '/reports',
+        builder: (_, __) => const _ExitWrapper(
+          homeRoute: '/dashboard',
+          child: ReportsScreen(),
+        ),
+      ),
       GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
-      GoRoute(path: '/users', builder: (_, __) => const _ExitWrapper(child: UsersScreen())),
+      GoRoute(
+        path: '/users',
+        builder: (_, __) => const _ExitWrapper(
+          homeRoute: '/dashboard',
+          child: UsersScreen(),
+        ),
+      ),
       GoRoute(path: '/users/new', builder: (_, __) => const CreateUserScreen()),
 
       // ── Karagar routes ──────────────────────────────────────────
-      GoRoute(path: '/home', builder: (_, __) => const _ExitWrapper(child: KaragarHomeScreen())),
-      GoRoute(path: '/my-gold', builder: (_, __) => const _ExitWrapper(child: MyGoldScreen())),
-      GoRoute(path: '/my-payroll', builder: (_, __) => const _ExitWrapper(child: KaragarPayrollScreen())),
-      GoRoute(path: '/profile', builder: (_, __) => const SettingsScreen()),
+      GoRoute(
+        path: '/home',
+        builder: (_, __) => const _ExitWrapper(
+          homeRoute: '/home',
+          showExitDialog: true,
+          child: KaragarHomeScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/my-gold',
+        builder: (_, __) => const _ExitWrapper(
+          homeRoute: '/home',
+          child: MyGoldScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/my-payroll',
+        builder: (_, __) => const _ExitWrapper(
+          homeRoute: '/home',
+          child: KaragarPayrollScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (_, __) => const SettingsScreen(title: 'Profile'),
+      ),
     ],
     errorBuilder: (_, state) => Scaffold(
       body: Center(child: Text('Page not found: ${state.error}')),
@@ -112,7 +191,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 /// Handles Android back events on the app's primary routes.
 class _ExitWrapper extends StatelessWidget {
   final Widget child;
-  const _ExitWrapper({required this.child});
+  final String homeRoute;
+  final bool showExitDialog;
+
+  const _ExitWrapper({
+    required this.child,
+    required this.homeRoute,
+    this.showExitDialog = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -126,12 +212,8 @@ class _ExitWrapper extends StatelessWidget {
           return;
         }
 
-        final location = GoRouterState.of(context).uri.path;
-        final home = location.startsWith('/my-') || location == '/home'
-            ? '/home'
-            : '/dashboard';
-        if (location != home) {
-          router.go(home);
+        if (!showExitDialog) {
+          router.go(homeRoute);
           return;
         }
 
@@ -159,7 +241,8 @@ class _ExitWrapper extends StatelessWidget {
   }
 }
 
-bool _isManagerRoute(String loc) => const [
+bool _isManagerRoute(String loc) =>
+    const [
       '/dashboard',
       '/karagars',
       '/treasury',
@@ -170,7 +253,8 @@ bool _isManagerRoute(String loc) => const [
       '/reports',
       '/users',
       '/jobs/new',
-    ].any((r) => loc.startsWith(r)) || loc == '/jobs';
+    ].any((r) => loc.startsWith(r)) ||
+    loc == '/jobs';
 
 class _AuthListenable extends ChangeNotifier {
   _AuthListenable(Ref ref) {
