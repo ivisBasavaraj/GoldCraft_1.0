@@ -38,11 +38,16 @@ class UsersScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: GoldCraftColors.background,
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          tooltip: 'Back to dashboard',
+          onPressed: () => context.go('/dashboard'),
+        ),
         title: const Text('User Management'),
-        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.person_add_outlined),
+            tooltip: 'Create user',
             onPressed: () => context.push('/users/new'),
           ),
         ],
@@ -62,7 +67,7 @@ class UsersScreen extends ConsumerWidget {
             );
           }
           return RefreshIndicator(
-            color: GoldCraftColors.jewelryGold,
+            color: GoldCraftColors.workshopGreen,
             onRefresh: () async => ref.invalidate(usersProvider),
             child: ListView.separated(
               padding: const EdgeInsets.all(20),
@@ -75,44 +80,6 @@ class UsersScreen extends ConsumerWidget {
             ),
           );
         },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/users/new'),
-        backgroundColor: GoldCraftColors.jewelryGold,
-        foregroundColor: GoldCraftColors.pureWhite,
-        icon: const Icon(Icons.person_add_outlined),
-        label: const Text('Create User'),
-      ),
-      bottomNavigationBar: _UsersBottomNav(),
-    );
-  }
-}
-
-// ── Bottom Nav (admin) ────────────────────────────────────────────────────────
-
-class _UsersBottomNav extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: GoldCraftColors.pureWhite,
-        border: Border(top: BorderSide(color: GoldCraftColors.divider)),
-      ),
-      child: BottomNavigationBar(
-        currentIndex: 5,
-        onTap: (i) {
-          const routes = ['/dashboard', '/karagars', '/jobs', '/treasury', '/reports', '/users'];
-          if (i == 5) return;
-          if (i < routes.length) context.push(routes[i]);
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard_outlined), activeIcon: Icon(Icons.dashboard_rounded), label: 'Dashboard'),
-          BottomNavigationBarItem(icon: Icon(Icons.people_outline), activeIcon: Icon(Icons.people_rounded), label: 'Karagars'),
-          BottomNavigationBarItem(icon: Icon(Icons.work_outline_rounded), activeIcon: Icon(Icons.work_rounded), label: 'Jobs'),
-          BottomNavigationBarItem(icon: Icon(Icons.account_balance_outlined), activeIcon: Icon(Icons.account_balance_rounded), label: 'Treasury'),
-          BottomNavigationBarItem(icon: Icon(Icons.bar_chart_outlined), activeIcon: Icon(Icons.bar_chart_rounded), label: 'Reports'),
-          BottomNavigationBarItem(icon: Icon(Icons.manage_accounts_rounded), label: 'Users'),
-        ],
       ),
     );
   }
@@ -138,7 +105,11 @@ class _UserTile extends ConsumerWidget {
 
     final (badgeType, badgeLabel, avatarColor) = switch (role) {
       'admin' => (GoldCraftBadgeType.error, 'Admin', GoldCraftColors.softRed),
-      'manager' => (GoldCraftBadgeType.warning, 'Manager', GoldCraftColors.softAmber),
+      'manager' => (
+          GoldCraftBadgeType.warning,
+          'Manager',
+          GoldCraftColors.softAmber
+        ),
       _ => (GoldCraftBadgeType.info, 'Karagar', GoldCraftColors.softBlue),
     };
 
@@ -146,7 +117,7 @@ class _UserTile extends ConsumerWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: GoldCraftColors.pureWhite,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: GoldCraftColors.divider),
       ),
       child: Row(
@@ -214,7 +185,7 @@ class _UserTile extends ConsumerWidget {
               children: [
                 IconButton(
                   icon: const Icon(Icons.key_outlined,
-                      color: GoldCraftColors.jewelryGoldDark, size: 20),
+                      color: GoldCraftColors.workshopGreenDark, size: 20),
                   tooltip: 'Change Password',
                   onPressed: () => _changePassword(context, ref),
                 ),
@@ -257,7 +228,7 @@ class _UserTile extends ConsumerWidget {
             children: [
               Row(children: [
                 const Icon(Icons.key_outlined,
-                    color: GoldCraftColors.jewelryGold),
+                    color: GoldCraftColors.workshopGreen),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -317,10 +288,10 @@ class _UserTile extends ConsumerWidget {
                 height: 52,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: GoldCraftColors.jewelryGold,
+                    backgroundColor: GoldCraftColors.workshopGreen,
                     foregroundColor: GoldCraftColors.pureWhite,
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
+                        borderRadius: BorderRadius.circular(18)),
                   ),
                   onPressed: () async {
                     final np = newPassCtrl.text;
@@ -338,13 +309,11 @@ class _UserTile extends ConsumerWidget {
                     Navigator.pop(ctx);
                     try {
                       final dio = ref.read(dioProvider);
-                      await dio.patch(
-                          '/users/${user['_id']}/password',
+                      await dio.patch('/users/${user['_id']}/password',
                           data: {'password': np});
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text(
-                              'Password updated for ${user['name']}'),
+                          content: Text('Password updated for ${user['name']}'),
                         ));
                       }
                     } on DioException catch (e) {
