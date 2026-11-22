@@ -3,9 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../data/karagars_provider.dart';
 import '../../domain/karagar_model.dart';
+import '../../../auth/domain/auth_provider.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../shared/widgets/gc_states.dart';
 import '../../../../shared/widgets/gc_badge.dart';
+import '../../../../shared/widgets/gc_ui.dart';
+import '../widgets/karagar_avatar.dart';
 
 class KaragarsScreen extends ConsumerStatefulWidget {
   const KaragarsScreen({super.key});
@@ -36,19 +39,19 @@ class _KaragarsScreenState extends ConsumerState<KaragarsScreen> {
   @override
   Widget build(BuildContext context) {
     final karagarsAsync = ref.watch(karagarsProvider);
+    final isAdmin = ref.watch(authUserProvider).valueOrNull?.isAdmin == true;
 
-    return Scaffold(
-      backgroundColor: GoldCraftColors.background,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          tooltip: 'Back to dashboard',
-          onPressed: () => context.go('/dashboard'),
-        ),
-        title: const Text('Karagars'),
+    return GcScaffold(
+      isAdmin: isAdmin,
+      bottomNav: GcBottomNav(currentIndex: 1, isAdmin: isAdmin),
+      header: GcPageHeader(
+        title: 'Karagars',
+        onBack: () => context.go('/dashboard'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.person_add_outlined),
+          GcCircleButton(
+            icon: Icons.person_add_outlined,
+            tooltip: 'Add karagar',
+            color: GcUi.primary(isAdmin),
             onPressed: () => context.push('/karagars/new'),
           ),
         ],
@@ -58,7 +61,8 @@ class _KaragarsScreenState extends ConsumerState<KaragarsScreen> {
           _buildSearchBar(),
           Expanded(
             child: karagarsAsync.when(
-              loading: () => const GcLoadingIndicator(message: 'Loading artisans...'),
+              loading: () =>
+                  const GcLoadingIndicator(message: 'Loading artisans...'),
               error: (e, _) => GcErrorState(
                 message: e.toString(),
                 onRetry: () => ref.invalidate(karagarsProvider),
@@ -73,10 +77,11 @@ class _KaragarsScreenState extends ConsumerState<KaragarsScreen> {
                   );
                 }
                 return ListView.separated(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                   itemCount: filtered.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (_, i) => _KaragarCard(karagar: filtered[i]),
+                  itemBuilder: (_, i) =>
+                      _KaragarCard(karagar: filtered[i], isAdmin: isAdmin),
                 );
               },
             ),
@@ -88,14 +93,19 @@ class _KaragarsScreenState extends ConsumerState<KaragarsScreen> {
 
   Widget _buildSearchBar() {
     return Container(
-      color: GoldCraftColors.pureWhite,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      decoration: GcUi.card(radius: 30),
       child: TextField(
         controller: _searchCtrl,
         onChanged: (v) => setState(() => _searchQuery = v),
         decoration: InputDecoration(
           hintText: 'Search by name or employee code...',
-          prefixIcon: const Icon(Icons.search_rounded, color: GoldCraftColors.textHint),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          filled: false,
+          prefixIcon:
+              const Icon(Icons.search_rounded, color: GcUi.muted),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear_rounded, size: 18),
@@ -105,7 +115,8 @@ class _KaragarsScreenState extends ConsumerState<KaragarsScreen> {
                   },
                 )
               : null,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
       ),
     );
@@ -114,104 +125,110 @@ class _KaragarsScreenState extends ConsumerState<KaragarsScreen> {
 
 class _KaragarCard extends StatelessWidget {
   final Karagar karagar;
-  const _KaragarCard({required this.karagar});
+  final bool isAdmin;
+  const _KaragarCard({required this.karagar, required this.isAdmin});
 
   @override
   Widget build(BuildContext context) {
+    final accent = karagar.isActive ? GcUi.gold : GcUi.border;
+
     return GestureDetector(
       onTap: () => context.push('/karagars/${karagar.id}'),
       child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: GoldCraftColors.pureWhite,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: GoldCraftColors.divider),
-        ),
-        child: Row(
-          children: [
-            // Avatar
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: karagar.isActive
-                    ? GoldCraftColors.jewelryGoldLight
-                    : GoldCraftColors.warmIvory,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Center(
-                child: Text(
-                  karagar.name.substring(0, 1).toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: karagar.isActive
-                        ? GoldCraftColors.jewelryGoldDark
-                        : GoldCraftColors.textHint,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 14),
-            // Info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          karagar.name,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: GoldCraftColors.charcoal,
+        decoration: GcUi.card(radius: 20),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(width: 5, color: accent),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        // Avatar
+                        KaragarAvatar(
+                          name: karagar.name,
+                          imageUrl: karagar.avatarUrl,
+                          size: 56,
+                          backgroundColor: karagar.isActive
+                              ? GcUi.goldTint
+                              : GoldCraftColors.warmIvory,
+                          foregroundColor:
+                              karagar.isActive ? GcUi.ink : GcUi.muted,
+                          borderColor:
+                              karagar.isActive ? GcUi.gold : GcUi.border,
+                          borderWidth: 2,
+                        ),
+                        const SizedBox(width: 14),
+                        // Info
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      karagar.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w800,
+                                        color: GcUi.ink,
+                                      ),
+                                    ),
+                                  ),
+                                  GoldCraftBadge(
+                                    label:
+                                        karagar.isActive ? 'Active' : 'Inactive',
+                                    type: karagar.isActive
+                                        ? GoldCraftBadgeType.success
+                                        : GoldCraftBadgeType.neutral,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${karagar.employeeCode} · ${karagar.meltingGroup}',
+                                style: const TextStyle(
+                                    fontSize: 13, color: GcUi.muted),
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 12,
+                                runSpacing: 4,
+                                children: [
+                                  _StatChip(
+                                    icon: Icons.work_outline_rounded,
+                                    label: '${karagar.activeJobCount} jobs',
+                                  ),
+                                  _StatChip(
+                                    icon: Icons.swap_horiz_rounded,
+                                    label:
+                                        '${karagar.outstandingCustodyGrams.toStringAsFixed(1)} g custody',
+                                    color: karagar.outstandingCustodyGrams > 0
+                                        ? GoldCraftColors.softAmberText
+                                        : GoldCraftColors.softGreenText,
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                      GoldCraftBadge(
-                        label: karagar.isActive ? 'Active' : 'Inactive',
-                        type: karagar.isActive
-                            ? GoldCraftBadgeType.success
-                            : GoldCraftBadgeType.neutral,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${karagar.employeeCode} · ${karagar.meltingGroup}',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: GoldCraftColors.textSecondary,
+                        const SizedBox(width: 4),
+                        const Icon(Icons.chevron_right_rounded,
+                            color: GcUi.ink, size: 26),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      _StatChip(
-                        icon: Icons.work_outline_rounded,
-                        label: '${karagar.activeJobCount} jobs',
-                      ),
-                      const SizedBox(width: 8),
-                      _StatChip(
-                        icon: Icons.swap_horiz_rounded,
-                        label: '${karagar.outstandingCustodyGrams.toStringAsFixed(1)} g custody',
-                        color: karagar.outstandingCustodyGrams > 0
-                            ? GoldCraftColors.softAmberText
-                            : GoldCraftColors.softGreenText,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: GoldCraftColors.textHint,
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -226,7 +243,7 @@ class _StatChip extends StatelessWidget {
   const _StatChip({
     required this.icon,
     required this.label,
-    this.color = GoldCraftColors.textSecondary,
+    this.color = GcUi.muted,
   });
 
   @override
@@ -234,13 +251,13 @@ class _StatChip extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 13, color: color),
+        Icon(icon, size: 15, color: color),
         const SizedBox(width: 4),
         Text(
           label,
           style: TextStyle(
             fontSize: 12,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
             color: color,
           ),
         ),

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../domain/auth_provider.dart';
-import '../../../../core/theme/colors.dart';
+import '../../../../shared/widgets/gc_ui.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -46,15 +46,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         }
       },
       error: (e, _) {
-        final msg = e.toString().contains('Internet') || e.toString().contains('Network')
-            ? 'Cannot reach server. Check your internet connection.'
-            : e.toString();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(msg),
-            backgroundColor: GoldCraftColors.softRedText,
-          ),
-        );
+        final msg =
+            e.toString().contains('Internet') || e.toString().contains('Network')
+                ? 'Cannot reach server. Check your internet connection.'
+                : e.toString();
+        gcSnack(context, msg, error: true);
       },
       loading: () {},
     );
@@ -63,18 +59,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: GoldCraftColors.charcoal,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildLogo(),
-                const SizedBox(height: 40),
-                _buildCard(),
-              ],
+      backgroundColor: GcUi.bg,
+      body: GcWaveBackground(
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildLogo(),
+                  const SizedBox(height: 32),
+                  _buildCard(),
+                ],
+              ),
             ),
           ),
         ),
@@ -86,43 +84,47 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Column(
       children: [
         Container(
-          width: 80,
-          height: 80,
+          width: 84,
+          height: 84,
           decoration: BoxDecoration(
-            color: GoldCraftColors.jewelryGold,
-            borderRadius: BorderRadius.circular(24),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: GcUi.heroGradient(false),
+            ),
+            borderRadius: BorderRadius.circular(26),
             boxShadow: [
               BoxShadow(
-                color: GoldCraftColors.jewelryGold.withOpacity(0.4),
+                color: GcUi.greenDark.withValues(alpha: 0.3),
                 blurRadius: 24,
-                offset: const Offset(0, 8),
+                offset: const Offset(0, 10),
               ),
             ],
           ),
-          child: const Icon(
-            Icons.diamond_outlined,
-            color: GoldCraftColors.pureWhite,
-            size: 40,
-          ),
+          child: const Icon(Icons.diamond_outlined, color: GcUi.gold, size: 42),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 18),
         const Text(
           'GoldCraft',
           style: TextStyle(
             fontSize: 32,
-            fontWeight: FontWeight.w700,
-            color: GoldCraftColors.pureWhite,
+            fontWeight: FontWeight.w800,
+            color: GcUi.ink,
             letterSpacing: -0.5,
           ),
         ),
         const SizedBox(height: 6),
+        Container(
+          width: 40,
+          height: 3,
+          decoration: BoxDecoration(
+              color: GcUi.gold, borderRadius: BorderRadius.circular(2)),
+        ),
+        const SizedBox(height: 8),
         const Text(
           'Jewelry Manufacturing ERP',
           style: TextStyle(
-            fontSize: 14,
-            color: GoldCraftColors.textHint,
-            letterSpacing: 0.5,
-          ),
+              fontSize: 14, color: GcUi.muted, letterSpacing: 0.4),
         ),
       ],
     );
@@ -132,49 +134,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Container(
       width: double.infinity,
       constraints: const BoxConstraints(maxWidth: 420),
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        color: GoldCraftColors.pureWhite,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 40,
-            offset: const Offset(0, 16),
-          ),
-        ],
-      ),
+      padding: const EdgeInsets.all(24),
+      decoration: GcUi.card(radius: 28),
       child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Sign In',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
-                color: GoldCraftColors.charcoal,
-              ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Enter your credentials to continue',
-              style: TextStyle(
-                fontSize: 14,
-                color: GoldCraftColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 28),
+            const Text('Sign In',
+                style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: GcUi.ink)),
+            const SizedBox(height: 4),
+            const Text('Enter your credentials to continue',
+                style: TextStyle(fontSize: 14, color: GcUi.muted)),
+            const SizedBox(height: 24),
             TextFormField(
               controller: _userCtrl,
               keyboardType: TextInputType.text,
               textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: 'Username',
-                prefixIcon: Icon(Icons.person_outline_rounded),
-              ),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Username is required' : null,
+              decoration: GcUi.input(
+                  label: 'Username', icon: Icons.person_outline_rounded),
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? 'Username is required'
+                  : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -182,36 +166,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               obscureText: _obscure,
               textInputAction: TextInputAction.done,
               onFieldSubmitted: (_) => _submit(),
-              decoration: InputDecoration(
-                labelText: 'Password',
-                prefixIcon: const Icon(Icons.lock_outline_rounded),
-                suffixIcon: IconButton(
+              decoration: GcUi.input(
+                label: 'Password',
+                icon: Icons.lock_outline_rounded,
+                suffix: IconButton(
                   icon: Icon(
-                    _obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                    color: GoldCraftColors.textSecondary,
+                    _obscure
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                    color: GcUi.muted,
                   ),
                   onPressed: () => setState(() => _obscure = !_obscure),
                 ),
               ),
-              validator: (v) => (v == null || v.isEmpty) ? 'Password is required' : null,
+              validator: (v) =>
+                  (v == null || v.isEmpty) ? 'Password is required' : null,
             ),
-            const SizedBox(height: 28),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _submit,
-                child: _isLoading
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          color: GoldCraftColors.pureWhite,
-                          strokeWidth: 2.5,
-                        ),
-                      )
-                    : const Text('Sign In'),
-              ),
+            const SizedBox(height: 24),
+            GcPrimaryButton(
+              label: 'Sign In',
+              loading: _isLoading,
+              onPressed: _submit,
             ),
             const SizedBox(height: 20),
             // Demo role quick-login for development
@@ -223,19 +198,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Widget _buildDemoSection() {
+    void fill(String u) {
+      _userCtrl.text = u;
+      _passCtrl.text = 'demo1234';
+    }
+
     return Column(
       children: [
         const Row(
           children: [
-            Expanded(child: Divider()),
+            Expanded(child: Divider(color: GcUi.border)),
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 12),
-              child: Text(
-                'Demo Access',
-                style: TextStyle(fontSize: 12, color: GoldCraftColors.textHint),
-              ),
+              child: Text('Demo Access',
+                  style: TextStyle(fontSize: 12, color: GcUi.muted)),
             ),
-            Expanded(child: Divider()),
+            Expanded(child: Divider(color: GcUi.border)),
           ],
         ),
         const SizedBox(height: 12),
@@ -245,10 +223,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               child: _DemoButton(
                 label: 'Admin',
                 icon: Icons.admin_panel_settings_outlined,
-                onTap: () {
-                  _userCtrl.text = 'admin';
-                  _passCtrl.text = 'demo1234';
-                },
+                onTap: () => fill('admin'),
               ),
             ),
             const SizedBox(width: 8),
@@ -256,10 +231,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               child: _DemoButton(
                 label: 'Manager',
                 icon: Icons.manage_accounts_outlined,
-                onTap: () {
-                  _userCtrl.text = 'manager';
-                  _passCtrl.text = 'demo1234';
-                },
+                onTap: () => fill('manager'),
               ),
             ),
             const SizedBox(width: 8),
@@ -267,10 +239,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               child: _DemoButton(
                 label: 'Karagar',
                 icon: Icons.handyman_outlined,
-                onTap: () {
-                  _userCtrl.text = 'karagar1';
-                  _passCtrl.text = 'demo1234';
-                },
+                onTap: () => fill('karagar1'),
               ),
             ),
           ],
@@ -293,16 +262,33 @@ class _DemoButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: onTap,
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size(0, 44),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        side: const BorderSide(color: GoldCraftColors.border),
-        foregroundColor: GoldCraftColors.textSecondary,
+    return InkWell(
+      borderRadius: BorderRadius.circular(22),
+      onTap: onTap,
+      child: Container(
+        height: 44,
+        decoration: BoxDecoration(
+          color: GcUi.ivory,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: GcUi.border),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 16, color: GcUi.green),
+            const SizedBox(width: 5),
+            Flexible(
+              child: Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: GcUi.ink)),
+            ),
+          ],
+        ),
       ),
-      icon: Icon(icon, size: 16),
-      label: Text(label, style: const TextStyle(fontSize: 13)),
     );
   }
 }

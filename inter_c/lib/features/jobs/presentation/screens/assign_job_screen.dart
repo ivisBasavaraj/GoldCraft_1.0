@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
+import 'package:intl/intl.dart';
 import '../../../karagars/data/karagars_provider.dart';
 import '../../data/jobs_provider.dart';
 import '../../../../core/network/dio_client.dart';
-import '../../../../core/theme/colors.dart';
 import '../../../../shared/widgets/gc_states.dart';
+import '../../../../shared/widgets/gc_ui.dart';
 
 class AssignJobScreen extends ConsumerStatefulWidget {
   final String? preselectedKaragarId;
@@ -42,12 +43,31 @@ class _AssignJobScreenState extends ConsumerState<AssignJobScreen> {
     super.dispose();
   }
 
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dueDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: Theme.of(ctx).colorScheme.copyWith(
+                primary: GcUi.greenDark,
+                onPrimary: Colors.white,
+                surface: Colors.white,
+                onSurface: GcUi.ink,
+              ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) setState(() => _dueDate = picked);
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedKaragarId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a karagar')),
-      );
+      gcSnack(context, 'Please select a karagar', error: true);
       return;
     }
     setState(() => _isSubmitting = true);
@@ -57,21 +77,15 @@ class _AssignJobScreenState extends ConsumerState<AssignJobScreen> {
         'title': _titleCtrl.text.trim(),
         'karagarId': _selectedKaragarId,
         'dueDate': _dueDate.toIso8601String(),
-        if (_notesCtrl.text.isNotEmpty) 'notes': _notesCtrl.text.trim(),
+        if (_notesCtrl.text.trim().isNotEmpty) 'notes': _notesCtrl.text.trim(),
       });
       if (!mounted) return;
       ref.invalidate(allJobsProvider(null));
+      gcSnack(context, 'Job assigned successfully');
       context.pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Job assigned successfully')),
-      );
     } on DioException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(mapDioError(e).message),
-            backgroundColor: GoldCraftColors.softRedText),
-      );
+      gcSnack(context, mapDioError(e).message, error: true);
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -80,68 +94,81 @@ class _AssignJobScreenState extends ConsumerState<AssignJobScreen> {
   @override
   Widget build(BuildContext context) {
     final karagarsAsync = ref.watch(karagarsProvider);
+    final locked = widget.preselectedKaragarId != null;
 
-    return Scaffold(
-      backgroundColor: GoldCraftColors.background,
-      appBar: AppBar(
-        title: Text(widget.preselectedKaragarId != null
-            ? 'Assign Job to ${widget.preselectedKaragarName ?? 'Karagar'}'
-            : 'Assign Work'),
+    return GcScaffold(
+      isAdmin: false,
+      header: GcPageHeader(
+        title: locked ? 'Assign Job' : 'Assign Work',
+        subtitle: locked
+            ? 'to ${widget.preselectedKaragarName ?? 'Karagar'}'
+            : 'Give a job to a karagar',
+        showBell: false,
       ),
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
-            _section('Job Details'),
-            _field(_titleCtrl, 'Job Title', hint: 'e.g. Bangle Work'),
-            const SizedBox(height: 16),
-            _section('Due Date'),
-            GestureDetector(
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _dueDate,
-                  firstDate: DateTime.now(),
-                  lastDate: DateTime.now().add(const Duration(days: 365)),
-                );
-                if (picked != null) setState(() => _dueDate = picked);
-              },
+            const GcSectionLabel('Job Details'),
+            TextFormField(
+              controller: _titleCtrl,
+              decoration: GcUi.input(
+                  label: 'Job Title',
+                  hint: 'e.g. Bangle Work',
+                  icon: Icons.work_outline_rounded),
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Required' : null,
+            ),
+            const SizedBox(height: 20),
+
+            const GcSectionLabel('Due Date'),
+            InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: _pickDate,
               child: Container(
-                padding: const EdgeInsets.all(16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 decoration: BoxDecoration(
-                  color: GoldCraftColors.pureWhite,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: GoldCraftColors.border),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: GcUi.border),
                 ),
                 child: Row(
                   children: [
                     const Icon(Icons.calendar_today_outlined,
-                        color: GoldCraftColors.textSecondary, size: 20),
+                        color: GcUi.muted, size: 20),
                     const SizedBox(width: 12),
-                    Text(
-                      '${_dueDate.day}/${_dueDate.month}/${_dueDate.year}',
-                      style: const TextStyle(
-                          fontSize: 15, color: GoldCraftColors.charcoal),
+                    Expanded(
+                      child: Text(
+                        DateFormat('EEE, d MMM yyyy').format(_dueDate),
+                        style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: GcUi.ink),
+                      ),
                     ),
+                    const Icon(Icons.edit_calendar_outlined,
+                        color: GcUi.green, size: 20),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            _section('Assign To'),
-            widget.preselectedKaragarId != null
+            const SizedBox(height: 20),
+
+            const GcSectionLabel('Assign To'),
+            locked
                 // Locked — came from karagar profile
                 ? Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: GoldCraftColors.jewelryGoldLight,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: GoldCraftColors.jewelryGold),
+                      color: GcUi.goldTint,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: GcUi.gold),
                     ),
                     child: Row(children: [
                       const Icon(Icons.person_rounded,
-                          color: GoldCraftColors.jewelryGoldDark, size: 20),
+                          color: GcUi.goldDark, size: 20),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
@@ -150,12 +177,12 @@ class _AssignJobScreenState extends ConsumerState<AssignJobScreen> {
                               '',
                           style: const TextStyle(
                               fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: GoldCraftColors.jewelryGoldDark),
+                              fontWeight: FontWeight.w700,
+                              color: GcUi.goldDark),
                         ),
                       ),
                       const Icon(Icons.lock_outline_rounded,
-                          size: 16, color: GoldCraftColors.jewelryGoldDark),
+                          size: 16, color: GcUi.goldDark),
                     ]),
                   )
                 // Free selection dropdown
@@ -163,17 +190,20 @@ class _AssignJobScreenState extends ConsumerState<AssignJobScreen> {
                     loading: () => const GcLoadingIndicator(),
                     error: (e, _) => GcErrorState(message: e.toString()),
                     data: (karagars) {
-                      final active = karagars.where((k) => k.isActive).toList();
+                      final active =
+                          karagars.where((k) => k.isActive).toList();
                       return DropdownButtonFormField<String>(
                         value: _selectedKaragarId,
-                        decoration: const InputDecoration(
-                          hintText: 'Select karagar',
-                          prefixIcon: Icon(Icons.person_outline_rounded),
-                        ),
+                        isExpanded: true,
+                        borderRadius: BorderRadius.circular(16),
+                        decoration: GcUi.input(
+                            hint: 'Select karagar',
+                            icon: Icons.person_outline_rounded),
                         items: active
                             .map((k) => DropdownMenuItem(
                                   value: k.id,
-                                  child: Text('${k.name} (${k.employeeCode})'),
+                                  child: Text('${k.name} (${k.employeeCode})',
+                                      overflow: TextOverflow.ellipsis),
                                 ))
                             .toList(),
                         onChanged: (v) =>
@@ -181,59 +211,25 @@ class _AssignJobScreenState extends ConsumerState<AssignJobScreen> {
                       );
                     },
                   ),
-            const SizedBox(height: 16),
-            _field(_notesCtrl, 'Notes (optional)',
-                required: false, maxLines: 3),
-            const SizedBox(height: 28),
-            SizedBox(
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _isSubmitting ? null : _submit,
-                child: _isSubmitting
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2.5))
-                    : const Text('Assign Job'),
-              ),
-            ),
             const SizedBox(height: 20),
+
+            const GcSectionLabel('Notes (optional)'),
+            TextFormField(
+              controller: _notesCtrl,
+              maxLines: 3,
+              decoration: GcUi.input(hint: 'Any instructions...'),
+            ),
+            const SizedBox(height: 32),
+
+            GcPrimaryButton(
+              label: 'Assign Job',
+              icon: Icons.assignment_turned_in_outlined,
+              loading: _isSubmitting,
+              onPressed: _submit,
+            ),
           ],
         ),
       ),
     );
   }
-
-  Widget _section(String title) => Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Text(title,
-            style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: GoldCraftColors.textSecondary)),
-      );
-
-  Widget _field(
-    TextEditingController ctrl,
-    String label, {
-    String? hint,
-    bool isNumber = false,
-    bool required = true,
-    int maxLines = 1,
-  }) =>
-      Padding(
-        padding: const EdgeInsets.only(bottom: 14),
-        child: TextFormField(
-          controller: ctrl,
-          keyboardType: isNumber
-              ? const TextInputType.numberWithOptions(decimal: true)
-              : TextInputType.text,
-          maxLines: maxLines,
-          decoration: InputDecoration(labelText: label, hintText: hint),
-          validator: required
-              ? (v) => (v == null || v.trim().isEmpty) ? 'Required' : null
-              : null,
-        ),
-      );
 }

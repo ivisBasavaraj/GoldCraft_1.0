@@ -5,9 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/network/dio_client.dart';
-import '../../../../core/theme/colors.dart';
-import '../../../../shared/widgets/gc_badge.dart';
 import '../../../../shared/widgets/gc_states.dart';
+import '../../../../shared/widgets/gc_ui.dart';
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 
@@ -35,23 +34,22 @@ class UsersScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final usersAsync = ref.watch(usersProvider);
 
-    return Scaffold(
-      backgroundColor: GoldCraftColors.background,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          tooltip: 'Back to dashboard',
-          onPressed: () => context.go('/dashboard'),
-        ),
-        title: const Text('User Management'),
+    return GcScaffold(
+      isAdmin: true,
+      header: GcPageHeader(
+        title: 'Users',
+        subtitle: 'Manager & karagar accounts',
+        showBell: false,
+        onBack: () => context.go('/dashboard'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.person_add_outlined),
+          GcCircleButton(
+            icon: Icons.person_add_alt_1_rounded,
             tooltip: 'Create user',
             onPressed: () => context.push('/users/new'),
           ),
         ],
       ),
+      bottomNav: const GcBottomNav(currentIndex: -1, isAdmin: true),
       body: usersAsync.when(
         loading: () => const GcLoadingIndicator(message: 'Loading users...'),
         error: (e, _) => GcErrorState(
@@ -67,12 +65,13 @@ class UsersScreen extends ConsumerWidget {
             );
           }
           return RefreshIndicator(
-            color: GoldCraftColors.workshopGreen,
+            color: GcUi.green,
             onRefresh: () async => ref.invalidate(usersProvider),
             child: ListView.separated(
-              padding: const EdgeInsets.all(20),
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
               itemCount: users.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemBuilder: (_, i) => _UserTile(
                 user: users[i],
                 onDeleted: () => ref.invalidate(usersProvider),
@@ -103,46 +102,23 @@ class _UserTile extends ConsumerWidget {
         ? DateTime.tryParse(user['createdAt'] as String)
         : null;
 
-    final (badgeType, badgeLabel, avatarColor) = switch (role) {
-      'admin' => (GoldCraftBadgeType.error, 'Admin', GoldCraftColors.softRed),
-      'manager' => (
-          GoldCraftBadgeType.warning,
-          'Manager',
-          GoldCraftColors.softAmber
-        ),
-      _ => (GoldCraftBadgeType.info, 'Karagar', GoldCraftColors.softBlue),
+    final (roleLabel, fg, bg) = switch (role) {
+      'admin' => ('ADMIN', GcUi.red, GcUi.redTint),
+      'manager' => ('MANAGER', GcUi.goldDark, GcUi.goldTint),
+      _ => ('KARAGAR', GcUi.blue, GcUi.blueTint),
     };
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: GoldCraftColors.pureWhite,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: GoldCraftColors.divider),
-      ),
+      decoration: GcUi.card(),
       child: Row(
         children: [
-          // Avatar
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: avatarColor,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Center(
-              child: Text(
-                name[0].toUpperCase(),
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: GoldCraftColors.charcoal,
-                ),
-              ),
-            ),
+          GcIconTile(
+            text: name.isEmpty ? '?' : name[0].toUpperCase(),
+            fg: fg,
+            bg: bg,
           ),
           const SizedBox(width: 14),
-          // Info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -150,29 +126,30 @@ class _UserTile extends ConsumerWidget {
                 Row(children: [
                   Expanded(
                     child: Text(name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                             fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: GoldCraftColors.charcoal)),
+                            fontWeight: FontWeight.w800,
+                            color: GcUi.ink)),
                   ),
-                  GoldCraftBadge(label: badgeLabel, type: badgeType),
+                  const SizedBox(width: 6),
+                  GcPill(label: roleLabel, fg: fg, bg: bg),
                 ]),
                 const SizedBox(height: 3),
                 Text('@$username',
-                    style: const TextStyle(
-                        fontSize: 13, color: GoldCraftColors.textSecondary)),
+                    style:
+                        const TextStyle(fontSize: 13, color: GcUi.muted)),
                 if (employeeCode != null) ...[
                   const SizedBox(height: 2),
                   Text(employeeCode,
-                      style: const TextStyle(
-                          fontSize: 12, color: GoldCraftColors.textHint)),
+                      style: const TextStyle(fontSize: 12, color: GcUi.hint)),
                 ],
                 if (createdAt != null) ...[
                   const SizedBox(height: 2),
                   Text(
                     'Created ${DateFormat('d MMM yyyy').format(createdAt)}',
-                    style: const TextStyle(
-                        fontSize: 11, color: GoldCraftColors.textHint),
+                    style: const TextStyle(fontSize: 11, color: GcUi.hint),
                   ),
                 ],
               ],
@@ -185,13 +162,13 @@ class _UserTile extends ConsumerWidget {
               children: [
                 IconButton(
                   icon: const Icon(Icons.key_outlined,
-                      color: GoldCraftColors.workshopGreenDark, size: 20),
+                      color: GcUi.green, size: 22),
                   tooltip: 'Change Password',
                   onPressed: () => _changePassword(context, ref),
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete_outline_rounded,
-                      color: GoldCraftColors.softRedText, size: 20),
+                      color: GcUi.red, size: 22),
                   tooltip: 'Delete User',
                   onPressed: () => _confirmDelete(context, ref),
                 ),
@@ -206,128 +183,131 @@ class _UserTile extends ConsumerWidget {
     final newPassCtrl = TextEditingController();
     final confirmCtrl = TextEditingController();
     bool obscure = true;
+    String? error;
 
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: GoldCraftColors.pureWhite,
+      backgroundColor: GcUi.bg,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => Padding(
           padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 24,
+            left: 20,
+            right: 20,
+            top: 12,
             bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: GcUi.border,
+                      borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const SizedBox(height: 16),
               Row(children: [
-                const Icon(Icons.key_outlined,
-                    color: GoldCraftColors.workshopGreen),
-                const SizedBox(width: 10),
+                const GcIconTile(
+                    icon: Icons.key_outlined,
+                    fg: GcUi.green,
+                    bg: GcUi.greenTint,
+                    size: 44),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    'Reset Password — ${user['name']}',
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w700),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Reset Password',
+                        style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: GcUi.ink),
+                      ),
+                      Text('${user['name']} · @${user['username']}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 13, color: GcUi.muted)),
+                    ],
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close_rounded),
+                  icon: const Icon(Icons.close_rounded, color: GcUi.ink),
                   onPressed: () => Navigator.pop(ctx),
                 ),
               ]),
-              const SizedBox(height: 4),
-              Text('@${user['username']}',
-                  style: const TextStyle(
-                      fontSize: 13, color: GoldCraftColors.textSecondary)),
               const SizedBox(height: 20),
               TextField(
                 controller: newPassCtrl,
                 obscureText: obscure,
-                decoration: InputDecoration(
-                  labelText: 'New Password',
-                  prefixIcon: const Icon(Icons.lock_outline_rounded),
-                  suffixIcon: IconButton(
-                    icon: Icon(obscure
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined),
+                decoration: GcUi.input(
+                  label: 'New Password',
+                  icon: Icons.lock_outline_rounded,
+                  suffix: IconButton(
+                    icon: Icon(
+                        obscure
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        color: GcUi.muted),
                     onPressed: () => setState(() => obscure = !obscure),
                   ),
-                  filled: true,
-                  fillColor: GoldCraftColors.warmIvory,
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: GoldCraftColors.border)),
                 ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: confirmCtrl,
                 obscureText: obscure,
-                decoration: InputDecoration(
-                  labelText: 'Confirm Password',
-                  prefixIcon: const Icon(Icons.lock_outline_rounded),
-                  filled: true,
-                  fillColor: GoldCraftColors.warmIvory,
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: GoldCraftColors.border)),
+                decoration: GcUi.input(
+                  label: 'Confirm Password',
+                  icon: Icons.lock_outline_rounded,
                 ),
               ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: GoldCraftColors.workshopGreen,
-                    foregroundColor: GoldCraftColors.pureWhite,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18)),
-                  ),
-                  onPressed: () async {
-                    final np = newPassCtrl.text;
-                    final cp = confirmCtrl.text;
-                    if (np.length < 6) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text('Minimum 6 characters')));
-                      return;
-                    }
-                    if (np != cp) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text('Passwords do not match')));
-                      return;
-                    }
-                    Navigator.pop(ctx);
-                    try {
-                      final dio = ref.read(dioProvider);
-                      await dio.patch('/users/${user['_id']}/password',
-                          data: {'password': np});
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text('Password updated for ${user['name']}'),
-                        ));
-                      }
-                    } on DioException catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text(mapDioError(e).message),
-                          backgroundColor: GoldCraftColors.softRedText,
-                        ));
-                      }
-                    }
-                  },
-                  child: const Text('Update Password',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
+              if (error != null) ...[
+                const SizedBox(height: 12),
+                GcBanner(
+                  icon: Icons.error_outline_rounded,
+                  text: error!,
+                  fg: GcUi.red,
+                  bg: GcUi.redTint,
                 ),
+              ],
+              const SizedBox(height: 20),
+              GcPrimaryButton(
+                label: 'Update Password',
+                onPressed: () async {
+                  final np = newPassCtrl.text;
+                  final cp = confirmCtrl.text;
+                  if (np.length < 6) {
+                    setState(() => error = 'Minimum 6 characters');
+                    return;
+                  }
+                  if (np != cp) {
+                    setState(() => error = 'Passwords do not match');
+                    return;
+                  }
+                  Navigator.pop(ctx);
+                  try {
+                    final dio = ref.read(dioProvider);
+                    await dio.patch('/users/${user['_id']}/password',
+                        data: {'password': np});
+                    if (context.mounted) {
+                      gcSnack(context, 'Password updated for ${user['name']}');
+                    }
+                  } on DioException catch (e) {
+                    if (context.mounted) {
+                      gcSnack(context, mapDioError(e).message, error: true);
+                    }
+                  }
+                },
               ),
             ],
           ),
@@ -342,18 +322,37 @@ class _UserTile extends ConsumerWidget {
   Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Delete User'),
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        icon: const GcIconTile(
+            icon: Icons.delete_outline_rounded,
+            fg: GcUi.red,
+            bg: GcUi.redTint,
+            size: 52),
+        title: const Text('Delete User',
+            style: TextStyle(fontWeight: FontWeight.w800, color: GcUi.ink)),
         content: Text(
-            'Delete "${user['name']}" (@${user['username']})? This cannot be undone.'),
+          'Delete "${user['name']}" (@${user['username']})? This cannot be undone.',
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: GcUi.muted),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel',
+                style: TextStyle(
+                    color: GcUi.muted, fontWeight: FontWeight.w700)),
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-                backgroundColor: GoldCraftColors.softRedText),
-            onPressed: () => Navigator.pop(context, true),
+              backgroundColor: GcUi.red,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: const StadiumBorder(),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Delete'),
           ),
         ],
@@ -364,17 +363,10 @@ class _UserTile extends ConsumerWidget {
       final dio = ref.read(dioProvider);
       await dio.delete('/users/${user['_id']}');
       onDeleted();
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User deleted')),
-        );
-      }
+      if (context.mounted) gcSnack(context, 'User deleted');
     } on DioException catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(mapDioError(e).message),
-          backgroundColor: GoldCraftColors.softRedText,
-        ));
+        gcSnack(context, mapDioError(e).message, error: true);
       }
     }
   }

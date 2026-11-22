@@ -103,7 +103,10 @@ class _ScaleCameraScreenState extends ConsumerState<ScaleCameraScreen> {
       });
 
       final formData = FormData.fromMap({
-        'file': await MultipartFile.fromFile(xFile.path, filename: 'scale.jpg'),
+        'image': await MultipartFile.fromFile(
+          xFile.path,
+          filename: xFile.name,
+        ),
       });
 
       final res = await ocrDio.post('/ocr/read-scale', data: formData);

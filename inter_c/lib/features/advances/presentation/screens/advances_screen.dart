@@ -4,9 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../data/advances_provider.dart';
 import '../../domain/advance_model.dart';
-import '../../../../core/theme/colors.dart';
 import '../../../../shared/widgets/gc_states.dart';
-import '../../../../shared/widgets/gc_badge.dart';
+import '../../../../shared/widgets/gc_ui.dart';
 
 class AdvancesScreen extends ConsumerWidget {
   const AdvancesScreen({super.key});
@@ -15,17 +14,21 @@ class AdvancesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final advancesAsync = ref.watch(advancesProvider(null));
 
-    return Scaffold(
-      backgroundColor: GoldCraftColors.background,
-      appBar: AppBar(
-        title: const Text('Advances'),
+    return GcScaffold(
+      isAdmin: false,
+      header: GcPageHeader(
+        title: 'Advances',
+        subtitle: 'Money given to karagars',
+        showBell: false,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add_rounded),
+          GcCircleButton(
+            icon: Icons.add_rounded,
+            tooltip: 'New advance',
             onPressed: () => context.push('/advances/new'),
           ),
         ],
       ),
+      bottomNav: const GcBottomNav(currentIndex: -1),
       body: advancesAsync.when(
         loading: () => const GcLoadingIndicator(message: 'Loading advances...'),
         error: (e, _) => GcErrorState(
@@ -41,12 +44,13 @@ class AdvancesScreen extends ConsumerWidget {
             );
           }
           return RefreshIndicator(
-            color: GoldCraftColors.jewelryGold,
+            color: GcUi.green,
             onRefresh: () async => ref.invalidate(advancesProvider(null)),
             child: ListView.separated(
-              padding: const EdgeInsets.all(16),
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
               itemCount: advances.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemBuilder: (_, i) => _AdvanceTile(advance: advances[i]),
             ),
           );
@@ -62,35 +66,23 @@ class _AdvanceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final repaid = advance.fullyRepaid;
+    final fg = repaid ? GcUi.green : GcUi.goldDark;
+    final bg = repaid ? GcUi.greenTint : GcUi.goldTint;
+
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: GoldCraftColors.pureWhite,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: GoldCraftColors.divider),
-      ),
+      decoration: GcUi.card(),
       child: Row(
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: advance.fullyRepaid
-                  ? GoldCraftColors.softGreen
-                  : GoldCraftColors.softAmber,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              advance.fullyRepaid
-                  ? Icons.check_circle_outline_rounded
-                  : Icons.payments_outlined,
-              color: advance.fullyRepaid
-                  ? GoldCraftColors.softGreenText
-                  : GoldCraftColors.softAmberText,
-              size: 24,
-            ),
+          GcIconTile(
+            icon: repaid
+                ? Icons.check_circle_outline_rounded
+                : Icons.payments_outlined,
+            fg: fg,
+            bg: bg,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -99,40 +91,40 @@ class _AdvanceTile extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(advance.karagarName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                               fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: GoldCraftColors.charcoal)),
+                              fontWeight: FontWeight.w800,
+                              color: GcUi.ink)),
                     ),
-                    GoldCraftBadge(
-                      label: advance.fullyRepaid ? 'Repaid' : 'Outstanding',
-                      type: advance.fullyRepaid
-                          ? GoldCraftBadgeType.success
-                          : GoldCraftBadgeType.warning,
+                    const SizedBox(width: 6),
+                    GcPill(
+                      label: repaid ? 'REPAID' : 'OUTSTANDING',
+                      fg: fg,
+                      bg: bg,
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '₹${advance.amountRupees.toStringAsFixed(0)} · ${advance.transactionId}',
-                  style: const TextStyle(
-                      fontSize: 12, color: GoldCraftColors.textSecondary),
+                  style: const TextStyle(fontSize: 12.5, color: GcUi.muted),
                 ),
-                if (!advance.fullyRepaid) ...[
+                if (!repaid) ...[
                   const SizedBox(height: 4),
                   Text(
                     'Outstanding: ₹${advance.outstandingRupees.toStringAsFixed(0)}',
                     style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: GoldCraftColors.softAmberText),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: GcUi.goldDark),
                   ),
                 ],
                 const SizedBox(height: 4),
                 Text(
                   DateFormat('d MMM yyyy').format(advance.createdAt),
-                  style: const TextStyle(
-                      fontSize: 11, color: GoldCraftColors.textHint),
+                  style: const TextStyle(fontSize: 11, color: GcUi.hint),
                 ),
               ],
             ),

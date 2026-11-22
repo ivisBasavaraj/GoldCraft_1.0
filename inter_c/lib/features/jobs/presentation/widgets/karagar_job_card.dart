@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../jobs/domain/job_model.dart';
 import '../../../../core/theme/colors.dart';
+import '../../../../shared/widgets/gc_ui.dart';
 
 class KaragarJobCard extends StatelessWidget {
   final Job job;
@@ -11,33 +12,50 @@ class KaragarJobCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => context.push('/jobs/${job.id}'),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        decoration: BoxDecoration(
-          color: GoldCraftColors.pureWhite,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: GoldCraftColors.divider),
-          boxShadow: const [
-            BoxShadow(
-              color: GoldCraftColors.shadowLight,
-              blurRadius: 12,
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            _buildHeader(),
-            const Divider(height: 1, color: GoldCraftColors.divider),
-            _buildGoldInfo(),
-            const Divider(height: 1, color: GoldCraftColors.divider),
-            _buildStatusAndAction(context),
-          ],
+    const cardShape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.all(Radius.circular(20)),
+      side: BorderSide(color: GoldCraftColors.divider),
+    );
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [
+          BoxShadow(
+            color: GoldCraftColors.shadowLight,
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: GoldCraftColors.pureWhite,
+        shape: cardShape,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          customBorder: cardShape,
+          onTap: () => _openJob(context),
+          child: Column(
+            children: [
+              _buildHeader(),
+              const Divider(height: 1, color: GoldCraftColors.divider),
+              _buildGoldInfo(),
+              const Divider(height: 1, color: GoldCraftColors.divider),
+              _buildStatusAndAction(context),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  void _openJob(BuildContext context) {
+    if (job.id.isEmpty) {
+      gcSnack(context, 'Unable to open this job: missing job ID.', error: true);
+      return;
+    }
+    context.push('/jobs/${Uri.encodeComponent(job.id)}');
   }
 
   Widget _buildHeader() {
@@ -216,7 +234,7 @@ class KaragarJobCard extends StatelessWidget {
               width: double.infinity,
               height: 52,
               child: ElevatedButton(
-                onPressed: () => context.push('/jobs/${job.id}'),
+                onPressed: () => _openJob(context),
                 child: Text(_actionLabel()),
               ),
             ),

@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../../jobs/data/jobs_provider.dart';
 import '../../../jobs/domain/job_model.dart';
 import '../../data/issuance_provider.dart';
-import '../../../../core/theme/colors.dart';
 import '../../../../shared/widgets/gc_states.dart';
+import '../../../../shared/widgets/gc_ui.dart';
 import '../../../../shared/widgets/scale_camera_screen.dart';
 import '../../../../features/auth/domain/auth_provider.dart';
 
@@ -18,15 +18,15 @@ class IssueGoldScreen extends ConsumerStatefulWidget {
 }
 
 class _IssueGoldScreenState extends ConsumerState<IssueGoldScreen> {
-  final _notesCtrl  = TextEditingController();
+  final _notesCtrl = TextEditingController();
 
   String? _selectedJobId;
-  bool    _isSubmitting = false;
+  bool _isSubmitting = false;
 
   double? _ocrGrams;
   double? _ocrConfidence;
   String? _ocrImagePath;
-  bool    _ocrScanned = false;
+  bool _ocrScanned = false;
 
   @override
   void initState() {
@@ -46,30 +46,25 @@ class _IssueGoldScreenState extends ConsumerState<IssueGoldScreen> {
     );
     if (result == null || !mounted) return;
     setState(() {
-      _ocrGrams      = result.valueGrams;
+      _ocrGrams = result.valueGrams;
       _ocrConfidence = result.confidence;
       _ocrImagePath = result.imagePath;
-      _ocrScanned    = true;
+      _ocrScanned = true;
     });
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(
-          'Scale read: ${result.valueGrams.toStringAsFixed(3)} g '
-          '(${(result.confidence * 100).toStringAsFixed(0)}% confidence)'),
-      backgroundColor: GoldCraftColors.softGreenText,
-    ));
+    gcSnack(
+      context,
+      'Scale read: ${result.valueGrams.toStringAsFixed(3)} g '
+      '(${(result.confidence * 100).toStringAsFixed(0)}% confidence)',
+    );
   }
 
   Future<void> _submit() async {
     if (_selectedJobId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select a job')));
+      gcSnack(context, 'Please select a job', error: true);
       return;
     }
     if (_ocrGrams == null || _ocrImagePath == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Scan the scale before issuing gold'),
-        backgroundColor: GoldCraftColors.softRedText,
-      ));
+      gcSnack(context, 'Scan the scale before issuing gold', error: true);
       return;
     }
     setState(() => _isSubmitting = true);
@@ -83,14 +78,11 @@ class _IssueGoldScreenState extends ConsumerState<IssueGoldScreen> {
         ocrImagePath: _ocrImagePath,
       );
       if (!mounted) return;
+      gcSnack(context, 'Gold issued successfully');
       context.pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gold issued successfully')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: GoldCraftColors.softRedText));
+      gcSnack(context, e.toString(), error: true);
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -98,90 +90,84 @@ class _IssueGoldScreenState extends ConsumerState<IssueGoldScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user      = ref.watch(authUserProvider).valueOrNull;
+    final user = ref.watch(authUserProvider).valueOrNull;
     final isKaragar = user?.isKaragar == true;
     final jobsAsync = isKaragar
         ? ref.watch(myJobsProvider)
         : ref.watch(allJobsProvider(null));
 
-    return Scaffold(
-      backgroundColor: GoldCraftColors.background,
-      appBar: AppBar(title: const Text('Issue Gold')),
+    return GcScaffold(
+      isAdmin: false,
+      header: const GcPageHeader(
+        title: 'Issue Gold',
+        subtitle: 'Weigh on the scale & issue to a job',
+        showBell: false,
+      ),
       body: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            _label('Select Job'),
-            jobsAsync.when(
-              loading: () => const GcLoadingIndicator(),
-              error: (e, _) => GcErrorState(message: e.toString()),
-              data: (jobs) {
-                final active = jobs
-                    .where((j) =>
-                        j.status == JobStatus.assigned ||
-                        j.status == JobStatus.inProgress)
-                    .toList();
-                return DropdownButtonFormField<String>(
-                  value: _selectedJobId,
-                  decoration: const InputDecoration(
-                      hintText: 'Select active job',
-                      prefixIcon: Icon(Icons.work_outline_rounded)),
-                  items: active
-                      .map((j) => DropdownMenuItem(
-                            value: j.id,
-                            child: Text('${j.title} — ${j.karagarName}',
-                                overflow: TextOverflow.ellipsis),
-                          ))
-                      .toList(),
-                  onChanged: (v) => setState(() => _selectedJobId = v),
-                );
-              },
-            ),
-            const SizedBox(height: 20),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        children: [
+          const GcSectionLabel('Select Job'),
+          jobsAsync.when(
+            loading: () => const GcLoadingIndicator(),
+            error: (e, _) => GcErrorState(message: e.toString()),
+            data: (jobs) {
+              final active = jobs
+                  .where((j) =>
+                      j.status == JobStatus.assigned ||
+                      j.status == JobStatus.inProgress)
+                  .toList();
+              // Guard: dropdown asserts if the selected id isn't in the list
+              final current = active.any((j) => j.id == _selectedJobId)
+                  ? _selectedJobId
+                  : null;
+              return DropdownButtonFormField<String>(
+                value: current,
+                isExpanded: true,
+                borderRadius: BorderRadius.circular(16),
+                decoration: GcUi.input(
+                    hint: 'Select active job',
+                    icon: Icons.work_outline_rounded),
+                items: active
+                    .map((j) => DropdownMenuItem(
+                          value: j.id,
+                          child: Text('${j.title} — ${j.karagarName}',
+                              overflow: TextOverflow.ellipsis),
+                        ))
+                    .toList(),
+                onChanged: (v) => setState(() => _selectedJobId = v),
+              );
+            },
+          ),
+          const SizedBox(height: 20),
 
-            // ── OCR scan ──────────────────────────────────────────────────
-            _label('Scale OCR Verification'),
-            _OcrScanCard(
-              ocrGrams: _ocrGrams,
-              confidence: _ocrConfidence,
-              scanned: _ocrScanned,
-              onScan: _scanScale,
-            ),
-            const SizedBox(height: 20),
+          // ── OCR scan ──────────────────────────────────────────────────
+          const GcSectionLabel('Scale OCR Verification'),
+          _OcrScanCard(
+            ocrGrams: _ocrGrams,
+            confidence: _ocrConfidence,
+            scanned: _ocrScanned,
+            onScan: _scanScale,
+          ),
+          const SizedBox(height: 20),
 
-            // ── Weight (auto-filled by OCR) ───────────────────────────────
-            _label('Notes (optional)'),
-            TextFormField(
-              controller: _notesCtrl,
-              maxLines: 3,
-              decoration: const InputDecoration(hintText: 'Any remarks...'),
-            ),
-            const SizedBox(height: 32),
+          const GcSectionLabel('Notes (optional)'),
+          TextFormField(
+            controller: _notesCtrl,
+            maxLines: 3,
+            decoration: GcUi.input(hint: 'Any remarks...'),
+          ),
+          const SizedBox(height: 32),
 
-            SizedBox(
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _isSubmitting ? null : _submit,
-                child: _isSubmitting
-                    ? const SizedBox(
-                        width: 22, height: 22,
-                        child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2.5))
-                    : const Text('Issue Gold'),
-              ),
-            ),
-          ],
-        ),
+          GcPrimaryButton(
+            label: 'Issue Gold',
+            icon: Icons.arrow_upward_rounded,
+            loading: _isSubmitting,
+            onPressed: _submit,
+          ),
+        ],
+      ),
     );
   }
-
-  Widget _label(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Text(text,
-            style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: GoldCraftColors.textSecondary)),
-      );
 }
 
 // ── Reusable OCR scan card ────────────────────────────────────────────────────
@@ -204,34 +190,24 @@ class _OcrScanCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: scanned ? GoldCraftColors.softGreen : GoldCraftColors.pureWhite,
-        borderRadius: BorderRadius.circular(14),
+        color: scanned ? GcUi.greenTint : Colors.white,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: scanned
-              ? GoldCraftColors.softGreenText
-              : GoldCraftColors.divider,
+          color: scanned ? GcUi.green : GcUi.border,
           width: scanned ? 1.5 : 1,
         ),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x0F000000), blurRadius: 10, offset: Offset(0, 4)),
+        ],
       ),
       child: Row(children: [
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: scanned
-                ? GoldCraftColors.softGreenText.withOpacity(0.15)
-                : GoldCraftColors.jewelryGoldLight,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(
-            scanned
-                ? Icons.verified_rounded
-                : Icons.document_scanner_outlined,
-            color: scanned
-                ? GoldCraftColors.softGreenText
-                : GoldCraftColors.jewelryGoldDark,
-            size: 26,
-          ),
+        GcIconTile(
+          icon: scanned
+              ? Icons.verified_rounded
+              : Icons.document_scanner_outlined,
+          fg: scanned ? GcUi.green : GcUi.goldDark,
+          bg: scanned ? Colors.white : GcUi.goldTint,
         ),
         const SizedBox(width: 14),
         Expanded(
@@ -241,15 +217,15 @@ class _OcrScanCard extends StatelessWidget {
                   children: [
                     const Text('Scale Verified',
                         style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: GoldCraftColors.softGreenText)),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: GcUi.green)),
+                    const SizedBox(height: 2),
                     Text(
                       '${ocrGrams!.toStringAsFixed(3)} g  ·  '
                       '${(confidence! * 100).toStringAsFixed(0)}% confidence',
-                      style: const TextStyle(
-                          fontSize: 12,
-                          color: GoldCraftColors.softGreenText),
+                      style:
+                          const TextStyle(fontSize: 12.5, color: GcUi.green),
                     ),
                   ],
                 )
@@ -258,13 +234,12 @@ class _OcrScanCard extends StatelessWidget {
                   children: [
                     Text('Scan Required',
                         style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: GoldCraftColors.charcoal)),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: GcUi.ink)),
+                    SizedBox(height: 2),
                     Text('Point camera at the scale display',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: GoldCraftColors.textSecondary)),
+                        style: TextStyle(fontSize: 12.5, color: GcUi.muted)),
                   ],
                 ),
         ),
@@ -275,9 +250,8 @@ class _OcrScanCard extends StatelessWidget {
               size: 18),
           label: Text(scanned ? 'Rescan' : 'Scan'),
           style: TextButton.styleFrom(
-            foregroundColor: scanned
-                ? GoldCraftColors.softGreenText
-                : GoldCraftColors.jewelryGoldDark,
+            foregroundColor: scanned ? GcUi.green : GcUi.goldDark,
+            textStyle: const TextStyle(fontWeight: FontWeight.w800),
           ),
         ),
       ]),

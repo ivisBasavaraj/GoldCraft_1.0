@@ -7,6 +7,7 @@ import '../../domain/payroll_model.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../shared/widgets/gc_states.dart';
 import '../../../../shared/widgets/gc_badge.dart';
+import '../../../../shared/widgets/gc_ui.dart';
 import '../../../karagars/data/karagars_provider.dart';
 
 enum _SortBy { newest, oldest, netHigh, netLow, karagarAz }
@@ -91,15 +92,20 @@ class _PayrollScreenState extends ConsumerState<PayrollScreen> {
   Widget build(BuildContext context) {
     final payrollsAsync = ref.watch(payrollsProvider(null));
 
-    return Scaffold(
-      backgroundColor: GoldCraftColors.background,
-      appBar: AppBar(title: const Text('Salary History')),
+    return GcScaffold(
+      isAdmin: false,
+      bottomNav: const GcBottomNav(currentIndex: -1),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showPaySalarySheet(context),
-        backgroundColor: GoldCraftColors.jewelryGold,
-        foregroundColor: Colors.black,
+        backgroundColor: GcUi.gold,
+        foregroundColor: GcUi.ink,
         icon: const Icon(Icons.payments_outlined),
-        label: const Text('Pay Salary'),
+        label: const Text('Pay Salary',
+            style: TextStyle(fontWeight: FontWeight.w700)),
+      ),
+      header: GcPageHeader(
+        title: 'Salary History',
+        showBack: context.canPop(),
       ),
       body: payrollsAsync.when(
         loading: () => const GcLoadingIndicator(message: 'Loading payrolls...'),
@@ -135,7 +141,7 @@ class _PayrollScreenState extends ConsumerState<PayrollScreen> {
                         subtitle: 'Try changing or clearing your filters.',
                       )
                     : RefreshIndicator(
-                        color: GoldCraftColors.jewelryGold,
+                        color: GcUi.green,
                         onRefresh: () async {
                           setState(() => _pendingPayrolls.clear());
                           ref.invalidate(payrollsProvider(null));
@@ -160,8 +166,9 @@ class _PayrollScreenState extends ConsumerState<PayrollScreen> {
       ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
     return Container(
-      color: GoldCraftColors.pureWhite,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+      decoration: GcUi.card(radius: 24, color: GcUi.ivory),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -212,10 +219,7 @@ class _PayrollScreenState extends ConsumerState<PayrollScreen> {
               Expanded(
                 child: Text(
                   'Showing $shownCount of ${all.length} records',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: GoldCraftColors.textSecondary,
-                  ),
+                  style: const TextStyle(fontSize: 12, color: GcUi.muted),
                 ),
               ),
               if (_hasActiveFilters || _sort != _SortBy.newest)
@@ -225,8 +229,8 @@ class _PayrollScreenState extends ConsumerState<PayrollScreen> {
                     'Clear all',
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: GoldCraftColors.jewelryGoldDark,
+                      fontWeight: FontWeight.w800,
+                      color: GcUi.goldDark,
                     ),
                   ),
                 ),
@@ -254,9 +258,9 @@ class _PayrollScreenState extends ConsumerState<PayrollScreen> {
     return showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: GoldCraftColors.background,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (ctx) => SafeArea(
         child: ConstrainedBox(
@@ -273,44 +277,71 @@ class _PayrollScreenState extends ConsumerState<PayrollScreen> {
                   height: 4,
                   margin: const EdgeInsets.only(top: 12, bottom: 16),
                   decoration: BoxDecoration(
-                    color: GoldCraftColors.divider,
+                    color: GcUi.border,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                 child: Text(
                   title,
                   style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: GoldCraftColors.charcoal,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: GcUi.ink,
                   ),
                 ),
               ),
               Flexible(
                 child: ListView(
                   shrinkWrap: true,
-                  padding: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                   children: [
                     for (final o in options)
-                      ListTile(
-                        title: Text(
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Material(
+                          color:
+                              o.$1 == selectedKey ? GcUi.greenTint : GcUi.ivory,
+                          borderRadius: BorderRadius.circular(16),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () => Navigator.pop(ctx, o.$1),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 14),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: o.$1 == selectedKey
+                                      ? GcUi.green
+                                      : GcUi.border,
+                                  width: o.$1 == selectedKey ? 1.5 : 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
                           o.$2,
                           style: TextStyle(
-                            fontSize: 14,
+                                        fontSize: 15,
                             fontWeight: o.$1 == selectedKey
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                            color: GoldCraftColors.charcoal,
+                                            ? FontWeight.w800
+                                            : FontWeight.w600,
+                                        color: GcUi.ink,
+                                      ),
+                                    ),
+                                  ),
+                                  if (o.$1 == selectedKey)
+                                    const Icon(Icons.check_circle_rounded,
+                                        color: GcUi.green, size: 22),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
-                        trailing: o.$1 == selectedKey
-                            ? const Icon(Icons.check_rounded,
-                                color: GoldCraftColors.jewelryGold)
-                            : null,
-                        onTap: () => Navigator.pop(ctx, o.$1),
                       ),
                   ],
                 ),
@@ -445,26 +476,27 @@ class _FilterPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg =
-        active ? GoldCraftColors.jewelryGoldDark : GoldCraftColors.charcoal;
+    final fg = active ? Colors.white : GcUi.ink;
 
     return Material(
-      color:
-          active ? GoldCraftColors.jewelryGoldLight : GoldCraftColors.pureWhite,
+      color: active ? GcUi.greenDark : Colors.white,
+      elevation: active ? 2 : 0,
+      shadowColor: Colors.black26,
       shape: StadiumBorder(
         side: BorderSide(
-          color: active ? GoldCraftColors.jewelryGold : GoldCraftColors.border,
+          color: active ? GcUi.greenDark : GcUi.border,
+          width: 1.2,
         ),
       ),
       child: InkWell(
         customBorder: const StadiumBorder(),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 16, color: fg),
+              Icon(icon, size: 17, color: fg),
               const SizedBox(width: 6),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 150),
@@ -474,7 +506,7 @@ class _FilterPill extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w600,
                     color: fg,
                   ),
                 ),
@@ -483,7 +515,7 @@ class _FilterPill extends StatelessWidget {
               if (active && onClear != null)
                 GestureDetector(
                   onTap: onClear,
-                  child: Icon(Icons.close_rounded, size: 16, color: fg),
+                  child: Icon(Icons.close_rounded, size: 17, color: fg),
                 )
               else
                 Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: fg),
@@ -583,6 +615,13 @@ class _PaySalarySheetState extends ConsumerState<_PaySalarySheet> {
     }
   }
 
+  Widget _label(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(text,
+            style: const TextStyle(
+                fontSize: 13, fontWeight: FontWeight.w700, color: GcUi.muted)),
+      );
+
   @override
   Widget build(BuildContext context) {
     final karagarsAsync = ref.watch(karagarsProvider);
@@ -590,11 +629,12 @@ class _PaySalarySheetState extends ConsumerState<_PaySalarySheet> {
 
     return Container(
       decoration: const BoxDecoration(
-        color: GoldCraftColors.background,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       padding: EdgeInsets.fromLTRB(
-          20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 24),
+          20, 12, 20, MediaQuery.of(context).viewInsets.bottom + 24),
+      child: SingleChildScrollView(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -606,25 +646,33 @@ class _PaySalarySheetState extends ConsumerState<_PaySalarySheet> {
               height: 4,
               margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
-                color: GoldCraftColors.divider,
+                  color: GcUi.border,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
           ),
+            Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: const BoxDecoration(
+                      color: GcUi.greenTint, shape: BoxShape.circle),
+                  child:
+                      const Icon(Icons.payments_rounded, color: GcUi.greenDark),
+                ),
+                const SizedBox(width: 14),
           const Text('Pay Salary',
               style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: GoldCraftColors.charcoal)),
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: GcUi.ink)),
+              ],
+            ),
           const SizedBox(height: 20),
 
           // Karagar selector
-          const Text('Karagar',
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: GoldCraftColors.textSecondary)),
-          const SizedBox(height: 8),
+            _label('Karagar'),
           karagarsAsync.when(
             loading: () => const GcLoadingIndicator(),
             error: (e, _) => GcErrorState(message: e.toString()),
@@ -655,12 +703,7 @@ class _PaySalarySheetState extends ConsumerState<_PaySalarySheet> {
           const SizedBox(height: 16),
 
           // Period
-          const Text('Pay Period',
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: GoldCraftColors.textSecondary)),
-          const SizedBox(height: 8),
+            _label('Pay Period'),
           Row(children: [
             Expanded(
               child: _DateTile(
@@ -681,15 +724,11 @@ class _PaySalarySheetState extends ConsumerState<_PaySalarySheet> {
           const SizedBox(height: 16),
 
           // Amount
-          const Text('Amount to Pay (₹)',
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: GoldCraftColors.textSecondary)),
-          const SizedBox(height: 8),
+            _label('Amount to Pay (₹)'),
           TextFormField(
             controller: _amountCtrl,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
             decoration: const InputDecoration(
               hintText: 'e.g. 5000',
               prefixText: '₹ ',
@@ -699,32 +738,45 @@ class _PaySalarySheetState extends ConsumerState<_PaySalarySheet> {
 
           if (_error != null) ...[
             const SizedBox(height: 10),
-            Text(_error!,
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: GoldCraftColors.softRed,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(_error!,
                 style: const TextStyle(
                     color: GoldCraftColors.softRedText, fontSize: 13)),
+              ),
           ],
           const SizedBox(height: 24),
 
           SizedBox(
             width: double.infinity,
-            height: 52,
+              height: 54,
             child: ElevatedButton.icon(
               onPressed: _loading ? null : _submit,
               style: ElevatedButton.styleFrom(
-                backgroundColor: GoldCraftColors.jewelryGold,
-                foregroundColor: Colors.black,
+                  backgroundColor: GcUi.greenDark,
+                  foregroundColor: Colors.white,
+                  shape: const StadiumBorder(),
+                  elevation: 3,
+                  textStyle: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700),
               ),
               icon: _loading
                   ? const SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.black))
+                            strokeWidth: 2, color: Colors.white))
                   : const Icon(Icons.payments_outlined),
               label: Text(_loading ? 'Processing...' : 'Generate & Pay'),
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -743,27 +795,24 @@ class _DateTile extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        decoration: BoxDecoration(
-          color: GoldCraftColors.pureWhite,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: GoldCraftColors.border),
-        ),
+        decoration: GcUi.card(radius: 16, color: GcUi.ivory),
         child: Row(children: [
           const Icon(Icons.calendar_today_outlined,
-              size: 16, color: GoldCraftColors.textSecondary),
+              size: 18, color: GcUi.greenDark),
           const SizedBox(width: 8),
-          Column(
+          Expanded(
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(label,
-                  style: const TextStyle(
-                      fontSize: 10, color: GoldCraftColors.textSecondary)),
+                    style: const TextStyle(fontSize: 11, color: GcUi.muted)),
               Text(date,
                   style: const TextStyle(
                       fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: GoldCraftColors.charcoal)),
+                        fontWeight: FontWeight.w700,
+                        color: GcUi.ink)),
             ],
+          ),
           ),
         ]),
       ),
@@ -800,116 +849,142 @@ class _SalaryTable extends StatelessWidget {
       children: [
         // ── Summary strip ───────────────────────────────────────────────────
         Container(
-          margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF2C1F0A), Color(0xFF4A3218)],
+            gradient: LinearGradient(
+              colors: GcUi.heroGradient(false),
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: GcUi.greenDark.withValues(alpha: 0.25),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
           child: Row(children: [
             _summaryCell(
                 'Records', '${payrolls.length}', Colors.white70, Colors.white),
             _summaryCell(
                 'Gross', '₹${_fmt(totalGross)}', Colors.white70, Colors.white),
-            _summaryCell('Net', '₹${_fmt(totalNet)}', Colors.white70,
-                GoldCraftColors.jewelryGold),
+            _summaryCell(
+                'Net', '₹${_fmt(totalNet)}', Colors.white70, GcUi.gold),
             _summaryCell('Paid', '₹${_fmt(totalPaid)}', Colors.white70,
-                const Color(0xFF81C784)),
+                const Color(0xFF86EFAC)),
           ]),
         ),
 
         // ── Table ───────────────────────────────────────────────────────────
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 90),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: DataTable(
-                  headingRowColor:
-                      WidgetStateProperty.all(GoldCraftColors.pureWhite),
-                  dataRowColor: WidgetStateProperty.resolveWith((states) {
-                    if (states.contains(WidgetState.selected)) {
-                      return GoldCraftColors.jewelryGoldLight.withOpacity(0.3);
-                    }
-                    return GoldCraftColors.pureWhite;
-                  }),
-                  dividerThickness: 1,
-                  columnSpacing: 20,
-                  headingTextStyle: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: GoldCraftColors.textSecondary,
-                    letterSpacing: 0.4,
-                  ),
-                  dataTextStyle: const TextStyle(
-                    fontSize: 13,
-                    color: GoldCraftColors.charcoal,
-                  ),
-                  border: TableBorder.all(
-                    color: GoldCraftColors.divider,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  columns: [
-                    if (showKaragarColumn)
-                      const DataColumn(label: Text('KARAGAR')),
-                    const DataColumn(label: Text('PERIOD')),
-                    const DataColumn(label: Text('GENERATED')),
-                    const DataColumn(label: Text('JOBS'), numeric: true),
-                    const DataColumn(label: Text('GROSS ₹'), numeric: true),
-                    const DataColumn(label: Text('NET ₹'), numeric: true),
-                    const DataColumn(label: Text('PAID ₹'), numeric: true),
-                    const DataColumn(label: Text('STATUS')),
-                  ],
-                  rows: payrolls.map((p) {
-                    final period =
-                        '${shortFmt.format(p.periodStart)} – ${shortFmt.format(p.periodEnd)}';
-                    final generated = dateFmt.format(p.createdAt);
-                    final (badgeType, badgeLabel) = _badge(p.status);
+              child: Container(
+                decoration: GcUi.card(radius: 18),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: DataTable(
+                    showCheckboxColumn: false,
+                    headingRowColor: WidgetStateProperty.all(GcUi.greenDark),
+                    dataRowColor: WidgetStateProperty.all(Colors.white),
+                    dividerThickness: 1,
+                    columnSpacing: 20,
+                    headingTextStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
+                    ),
+                    dataTextStyle:
+                        const TextStyle(fontSize: 13, color: GcUi.ink),
+                    border: const TableBorder(
+                      horizontalInside: BorderSide(color: GcUi.border),
+                    ),
+                    columns: [
+                      if (showKaragarColumn)
+                        const DataColumn(label: Text('KARAGAR')),
+                      const DataColumn(label: Text('PERIOD')),
+                      const DataColumn(label: Text('GENERATED')),
+                      const DataColumn(label: Text('JOBS'), numeric: true),
+                      const DataColumn(label: Text('GROSS ₹'), numeric: true),
+                      const DataColumn(label: Text('NET ₹'), numeric: true),
+                      const DataColumn(label: Text('PAID ₹'), numeric: true),
+                      const DataColumn(label: Text('STATUS')),
+                    ],
+                    rows: payrolls.map((p) {
+                      final period =
+                          '${shortFmt.format(p.periodStart)} – ${shortFmt.format(p.periodEnd)}';
+                      final generated = dateFmt.format(p.createdAt);
+                      final (badgeType, badgeLabel) = _badge(p.status);
+                      final onTap =
+                          onRowTap == null ? null : () => onRowTap!(p);
 
-                    return DataRow(
-                      onSelectChanged:
-                          onRowTap != null ? (_) => onRowTap!(p) : null,
-                      cells: [
-                        if (showKaragarColumn)
-                          DataCell(
-                            Text(p.karagarName,
+                      return DataRow(
+                        cells: [
+                          if (showKaragarColumn)
+                            DataCell(
+                              Text(
+                                p.karagarName,
                                 style: const TextStyle(
-                                    fontWeight: FontWeight.w600)),
+                                    fontWeight: FontWeight.w800),
+                              ),
+                              onTap: onTap,
+                            ),
+                          DataCell(
+                            Text(
+                              period,
+                              style:
+                                  const TextStyle(fontSize: 12, color: GcUi.muted),
+                            ),
+                            onTap: onTap,
                           ),
-                        DataCell(Text(period,
-                            style: const TextStyle(
-                                fontSize: 12,
-                                color: GoldCraftColors.textSecondary))),
-                        DataCell(Text(generated,
-                            style: const TextStyle(
-                                fontSize: 12,
-                                color: GoldCraftColors.textSecondary))),
-                        DataCell(Text('${p.jobsDone}')),
-                        DataCell(Text('₹${_fmt(p.grossLaborRupees)}')),
-                        DataCell(Text(
-                          '₹${_fmt(p.netPayableRupees)}',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        )),
-                        DataCell(Text(
-                          '₹${_fmt(p.paidRupees)}',
-                          style: TextStyle(
-                            color: p.paidRupees >= p.netPayableRupees
-                                ? GoldCraftColors.softGreenText
-                                : GoldCraftColors.softAmberText,
-                            fontWeight: FontWeight.w600,
+                          DataCell(
+                            Text(
+                              generated,
+                              style:
+                                  const TextStyle(fontSize: 12, color: GcUi.muted),
+                            ),
+                            onTap: onTap,
                           ),
-                        )),
-                        DataCell(
-                            GoldCraftBadge(label: badgeLabel, type: badgeType)),
-                      ],
-                    );
-                  }).toList(),
+                          DataCell(Text('${p.jobsDone}'), onTap: onTap),
+                          DataCell(
+                            Text('₹${_fmt(p.grossLaborRupees)}'),
+                            onTap: onTap,
+                          ),
+                          DataCell(
+                            Text(
+                              '₹${_fmt(p.netPayableRupees)}',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w800),
+                            ),
+                            onTap: onTap,
+                          ),
+                          DataCell(
+                            Text(
+                              '₹${_fmt(p.paidRupees)}',
+                              style: TextStyle(
+                                color: p.paidRupees >= p.netPayableRupees
+                                    ? GoldCraftColors.softGreenText
+                                    : GoldCraftColors.softAmberText,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            onTap: onTap,
+                          ),
+                          DataCell(
+                            GoldCraftBadge(
+                                label: badgeLabel, type: badgeType),
+                            onTap: onTap,
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  ),
                 ),
               ),
             ),
@@ -923,13 +998,16 @@ class _SalaryTable extends StatelessWidget {
           String label, String value, Color labelColor, Color valueColor) =>
       Expanded(
         child: Column(children: [
-          Text(label, style: TextStyle(fontSize: 10, color: labelColor)),
+          Text(label, style: TextStyle(fontSize: 11, color: labelColor)),
           const SizedBox(height: 2),
-          Text(value,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(value,
               style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
                   color: valueColor)),
+          ),
         ]),
       );
 

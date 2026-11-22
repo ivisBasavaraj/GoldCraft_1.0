@@ -5,19 +5,14 @@ import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
 import '../../data/treasury_provider.dart';
+import '../../../auth/domain/auth_provider.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../shared/widgets/gc_states.dart';
+import '../../../../shared/widgets/gc_ui.dart';
 import '../../../../core/network/dio_client.dart';
 
 // -----------------------------------------------------------------------------
-// API call: POST treasury/adjustment
-//
-// A dedicated endpoint for adding / removing gold. (PATCH treasury/reserve is
-// left alone: it is only for changing the opening reserve.)
-//
-// The backend does all the maths and validation (it checks the balance, saves
-// the transaction and returns the new summary), so the app only sends what the
-// user entered:
+// API call: POST treasury/adjustment  (unchanged)
 //   isAdd     -> true = add gold, false = remove gold
 //   amountMg  -> positive integer, in milligrams
 //   note      -> required by the server when removing
@@ -49,23 +44,90 @@ String _errorText(Object e) {
   return e.toString().replaceFirst('Exception: ', '');
 }
 
-class TreasuryScreen extends ConsumerWidget {
+// -----------------------------------------------------------------------------
+// Transaction filter
+// -----------------------------------------------------------------------------
+enum TxFilter { all, added, removed }
+
+class TreasuryScreen extends ConsumerStatefulWidget {
   const TreasuryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TreasuryScreen> createState() => _TreasuryScreenState();
+}
+
+class _TreasuryScreenState extends ConsumerState<TreasuryScreen> {
+  TxFilter _filter = TxFilter.all;
+  DateTime? _from;
+  DateTime? _to;
+
+  bool get _hasFilters =>
+      _filter != TxFilter.all || _from != null || _to != null;
+
+  void _clearFilters() => setState(() {
+        _filter = TxFilter.all;
+        _from = null;
+        _to = null;
+      });
+
+  Future<void> _pickDate({required bool isFrom}) async {
+    final now = DateTime.now();
+    final initial = (isFrom ? _from : _to) ?? now;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(now.year + 1),
+      helpText: isFrom ? 'From date' : 'To date',
+    );
+    if (picked == null) return;
+    setState(() {
+      if (isFrom) {
+        _from = picked;
+        // keep the range valid
+        if (_to != null && _to!.isBefore(picked)) _to = picked;
+      } else {
+        _to = picked;
+        if (_from != null && _from!.isAfter(picked)) _from = picked;
+      }
+    });
+  }
+
+  /// Client-side filtering of the already loaded transactions.
+  List<Map<String, dynamic>> _applyFilters(List<dynamic> items) {
+    final fromStart =
+        _from == null ? null : DateTime(_from!.year, _from!.month, _from!.day);
+    final toEnd = _to == null
+        ? null
+        : DateTime(_to!.year, _to!.month, _to!.day, 23, 59, 59, 999);
+
+    return items.map((e) => e as Map<String, dynamic>).where((t) {
+      final amountMg = (t['amountMg'] as num).toDouble();
+      final isDebit = amountMg < 0;
+
+      if (_filter == TxFilter.added && isDebit) return false;
+      if (_filter == TxFilter.removed && !isDebit) return false;
+
+      final date = DateTime.parse(t['createdAt'] as String).toLocal();
+      if (fromStart != null && date.isBefore(fromStart)) return false;
+      if (toEnd != null && date.isAfter(toEnd)) return false;
+      return true;
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final summaryAsync = ref.watch(treasurySummaryProvider);
     final txAsync = ref.watch(treasuryTransactionsProvider(1));
+    final isAdmin = ref.watch(authUserProvider).valueOrNull?.isAdmin == true;
+    final accent = GcUi.accent(isAdmin);
 
-    return Scaffold(
-      backgroundColor: GoldCraftColors.background,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          tooltip: 'Back to dashboard',
-          onPressed: () => context.go('/dashboard'),
-        ),
-        title: const Text('Treasury Vault'),
+    return GcScaffold(
+      isAdmin: isAdmin,
+      bottomNav: GcBottomNav(currentIndex: 3, isAdmin: isAdmin),
+      header: GcPageHeader(
+        title: 'Treasury Vault',
+        onBack: () => context.go('/dashboard'),
       ),
       body: summaryAsync.when(
         loading: () => const GcLoadingIndicator(message: 'Loading treasury...'),
@@ -74,53 +136,85 @@ class TreasuryScreen extends ConsumerWidget {
           onRetry: () => ref.invalidate(treasurySummaryProvider),
         ),
         data: (summary) => RefreshIndicator(
-          color: GoldCraftColors.workshopGreen,
+          color: accent,
           onRefresh: () async {
             ref.invalidate(treasurySummaryProvider);
             ref.invalidate(treasuryTransactionsProvider(1));
           },
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
-              // Summary card
+              // Summary hero card
               Container(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [
-                      GoldCraftColors.workshopGreenDark,
-                      GoldCraftColors.workshopGreen,
-                    ],
+                  gradient: LinearGradient(
+                    colors: GcUi.heroGradient(isAdmin),
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: [
+                    BoxShadow(
+                      color: GcUi.primary(isAdmin).withValues(alpha: 0.25),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Available Gold',
-                        style: TextStyle(fontSize: 13, color: Colors.white54)),
-                    const SizedBox(height: 6),
-                    Text(
-                      '${summary.availableGoldGrams.toStringAsFixed(3)} g',
-                      style: const TextStyle(
-                          fontSize: 36,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                          letterSpacing: -1),
+                    Row(
+                      children: [
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withValues(alpha: 0.1),
+                            border: Border.all(color: GcUi.gold, width: 1.5),
+                          ),
+                          child: const Icon(Icons.layers_rounded,
+                              color: GcUi.gold, size: 30),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Available Gold',
+                                  style: TextStyle(
+                                      fontSize: 15, color: Colors.white70)),
+                              const SizedBox(height: 2),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  '${summary.availableGoldGrams.toStringAsFixed(3)} g',
+                                  style: const TextStyle(
+                                      fontSize: 36,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                      letterSpacing: -1),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 18),
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(6),
                       child: LinearProgressIndicator(
                         value: (summary.reserveRemainingPercent / 100)
                             .clamp(0.0, 1.0),
-                        backgroundColor: Colors.white12,
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                            GoldCraftColors.jewelryGold),
-                        minHeight: 6,
+                        backgroundColor: Colors.white24,
+                        valueColor:
+                            const AlwaysStoppedAnimation<Color>(GcUi.gold),
+                        minHeight: 8,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -149,7 +243,7 @@ class TreasuryScreen extends ConsumerWidget {
                       label: 'Add Gold',
                       icon: Icons.add_circle_outline_rounded,
                       filled: true,
-                      color: GoldCraftColors.workshopGreen,
+                      color: GcUi.primary(isAdmin),
                       onTap: () => _openAdjustSheet(
                         context,
                         isAdd: true,
@@ -163,7 +257,7 @@ class TreasuryScreen extends ConsumerWidget {
                       label: 'Remove Gold',
                       icon: Icons.remove_circle_outline_rounded,
                       filled: false,
-                      color: GoldCraftColors.softAmberText,
+                      color: GcUi.goldDark,
                       onTap: () => _openAdjustSheet(
                         context,
                         isAdd: false,
@@ -173,30 +267,67 @@ class TreasuryScreen extends ConsumerWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 26),
 
-              const Text('Recent Transactions',
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: GoldCraftColors.charcoal)),
+              // Section title + clear filters
+              Row(
+                children: [
+                  Icon(Icons.receipt_long_outlined,
+                      color: GcUi.primary(isAdmin), size: 24),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text('Recent Transactions',
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: GcUi.ink)),
+                  ),
+                  if (_hasFilters)
+                    TextButton.icon(
+                      onPressed: _clearFilters,
+                      icon: const Icon(Icons.filter_alt_off_rounded, size: 18),
+                      label: const Text('Clear'),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // Filter bar: All / Added / Removed + From / To dates
+              _TxFilterBar(
+                filter: _filter,
+                from: _from,
+                to: _to,
+                color: GcUi.primary(isAdmin),
+                onFilterChanged: (f) => setState(() => _filter = f),
+                onPickFrom: () => _pickDate(isFrom: true),
+                onPickTo: () => _pickDate(isFrom: false),
+                onClearFrom: () => setState(() => _from = null),
+                onClearTo: () => setState(() => _to = null),
+              ),
               const SizedBox(height: 12),
+
               txAsync.when(
                 loading: () => const GcLoadingIndicator(),
                 error: (e, _) => GcErrorState(message: e.toString()),
                 data: (data) {
-                  final items = data['items'] as List<dynamic>? ?? [];
-                  if (items.isEmpty) {
+                  final all = data['items'] as List<dynamic>? ?? [];
+                  if (all.isEmpty) {
                     return const GcEmptyState(
                       icon: Icons.receipt_long_outlined,
                       title: 'No Transactions',
                       subtitle: 'Treasury transactions will appear here.',
                     );
                   }
+                  final items = _applyFilters(all);
+                  if (items.isEmpty) {
+                    return const GcEmptyState(
+                      icon: Icons.filter_alt_off_rounded,
+                      title: 'No Matching Transactions',
+                      subtitle: 'Try changing or clearing the filters.',
+                    );
+                  }
                   return Column(
-                    children: items
-                        .map((t) => _TxTile(tx: t as Map<String, dynamic>))
-                        .toList(),
+                    children: items.map((t) => _TxTile(tx: t)).toList(),
                   );
                 },
               ),
@@ -217,7 +348,7 @@ class TreasuryScreen extends ConsumerWidget {
       isScrollControlled: true,
       backgroundColor: GoldCraftColors.pureWhite,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (_) => _AdjustTreasurySheet(
         isAdd: isAdd,
@@ -232,14 +363,170 @@ class TreasuryScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(label,
-                style: const TextStyle(fontSize: 11, color: Colors.white70)),
+                style: const TextStyle(fontSize: 12, color: Colors.white70)),
             const SizedBox(height: 4),
             Text(value,
                 style: TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w700, color: color)),
+                    fontSize: 15, fontWeight: FontWeight.w700, color: color)),
           ],
         ),
       );
+}
+
+// -----------------------------------------------------------------------------
+// Filter bar (All / Added / Removed chips + From / To date pickers)
+// -----------------------------------------------------------------------------
+class _TxFilterBar extends StatelessWidget {
+  final TxFilter filter;
+  final DateTime? from;
+  final DateTime? to;
+  final Color color;
+  final ValueChanged<TxFilter> onFilterChanged;
+  final VoidCallback onPickFrom;
+  final VoidCallback onPickTo;
+  final VoidCallback onClearFrom;
+  final VoidCallback onClearTo;
+
+  const _TxFilterBar({
+    required this.filter,
+    required this.from,
+    required this.to,
+    required this.color,
+    required this.onFilterChanged,
+    required this.onPickFrom,
+    required this.onPickTo,
+    required this.onClearFrom,
+    required this.onClearTo,
+  });
+
+  Widget _chip(String label, TxFilter value) {
+    final selected = filter == value;
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      showCheckmark: false,
+      onSelected: (_) => onFilterChanged(value),
+      selectedColor: color,
+      backgroundColor: Colors.white,
+      labelStyle: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        color: selected ? Colors.white : GcUi.ink,
+      ),
+      side: BorderSide(color: selected ? color : GcUi.border),
+      shape: const StadiumBorder(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _chip('All', TxFilter.all),
+            _chip('Added', TxFilter.added),
+            _chip('Removed', TxFilter.removed),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _DateField(
+                label: 'From',
+                date: from,
+                color: color,
+                onTap: onPickFrom,
+                onClear: onClearFrom,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _DateField(
+                label: 'To',
+                date: to,
+                color: color,
+                onTap: onPickTo,
+                onClear: onClearTo,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _DateField extends StatelessWidget {
+  final String label;
+  final DateTime? date;
+  final Color color;
+  final VoidCallback onTap;
+  final VoidCallback onClear;
+
+  const _DateField({
+    required this.label,
+    required this.date,
+    required this.color,
+    required this.onTap,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasDate = date != null;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: hasDate ? color : GcUi.border),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.calendar_today_rounded,
+                size: 16, color: hasDate ? color : GcUi.muted),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style:
+                          const TextStyle(fontSize: 11, color: GcUi.muted)),
+                  Text(
+                    hasDate ? DateFormat('d MMM yyyy').format(date!) : 'Select',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: hasDate ? GcUi.ink : GcUi.muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (hasDate)
+              GestureDetector(
+                onTap: onClear,
+                child: const Padding(
+                  padding: EdgeInsets.only(left: 4),
+                  child: Icon(Icons.close_rounded, size: 18, color: GcUi.muted),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -262,15 +549,14 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shape =
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(14));
-    const size = Size(0, 52);
-    const textStyle = TextStyle(fontSize: 14, fontWeight: FontWeight.w600);
+    final shape = const StadiumBorder();
+    const size = Size(0, 54);
+    const textStyle = TextStyle(fontSize: 15, fontWeight: FontWeight.w700);
 
     if (filled) {
       return ElevatedButton.icon(
         onPressed: onTap,
-        icon: Icon(icon, size: 20),
+        icon: Icon(icon, size: 22),
         label: Text(label),
         style: ElevatedButton.styleFrom(
           backgroundColor: color,
@@ -278,16 +564,18 @@ class _ActionButton extends StatelessWidget {
           minimumSize: size,
           shape: shape,
           textStyle: textStyle,
-          elevation: 0,
+          elevation: 3,
+          shadowColor: Colors.black26,
         ),
       );
     }
     return OutlinedButton.icon(
       onPressed: onTap,
-      icon: Icon(icon, size: 20),
+      icon: Icon(icon, size: 22),
       label: Text(label),
       style: OutlinedButton.styleFrom(
         foregroundColor: color,
+        backgroundColor: Colors.white,
         minimumSize: size,
         shape: shape,
         textStyle: textStyle,
@@ -298,7 +586,7 @@ class _ActionButton extends StatelessWidget {
 }
 
 // -----------------------------------------------------------------------------
-// Bottom sheet form
+// Bottom sheet form (logic unchanged)
 // -----------------------------------------------------------------------------
 class _AdjustTreasurySheet extends ConsumerStatefulWidget {
   final bool isAdd;
@@ -410,11 +698,11 @@ class _AdjustTreasurySheetState extends ConsumerState<_AdjustTreasurySheet> {
               Row(
                 children: [
                   Container(
-                    width: 44,
-                    height: 44,
+                    width: 48,
+                    height: 48,
                     decoration: BoxDecoration(
                       color: _accentBg,
-                      borderRadius: BorderRadius.circular(12),
+                      shape: BoxShape.circle,
                     ),
                     child: Icon(
                       widget.isAdd ? Icons.add_rounded : Icons.remove_rounded,
@@ -432,8 +720,8 @@ class _AdjustTreasurySheetState extends ConsumerState<_AdjustTreasurySheet> {
                               : 'Remove Gold from Treasury',
                           style: const TextStyle(
                             fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: GoldCraftColors.charcoal,
+                            fontWeight: FontWeight.w800,
+                            color: GcUi.ink,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -441,7 +729,7 @@ class _AdjustTreasurySheetState extends ConsumerState<_AdjustTreasurySheet> {
                           'Available: ${widget.availableGrams.toStringAsFixed(3)} g',
                           style: const TextStyle(
                             fontSize: 13,
-                            color: GoldCraftColors.textSecondary,
+                            color: GcUi.muted,
                           ),
                         ),
                       ],
@@ -464,7 +752,7 @@ class _AdjustTreasurySheetState extends ConsumerState<_AdjustTreasurySheet> {
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
-                  color: GoldCraftColors.charcoal,
+                  color: GcUi.ink,
                 ),
                 decoration: InputDecoration(
                   labelText: 'Weight',
@@ -473,7 +761,7 @@ class _AdjustTreasurySheetState extends ConsumerState<_AdjustTreasurySheet> {
                   suffixStyle: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: GoldCraftColors.textSecondary,
+                    color: GcUi.muted,
                   ),
                   // "Max" shortcut only when removing
                   suffixIcon: widget.isAdd
@@ -532,7 +820,7 @@ class _AdjustTreasurySheetState extends ConsumerState<_AdjustTreasurySheet> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: GoldCraftColors.softRed,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     _error!,
@@ -553,8 +841,9 @@ class _AdjustTreasurySheetState extends ConsumerState<_AdjustTreasurySheet> {
                       onPressed: _saving ? null : () => Navigator.pop(context),
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size(0, 52),
-                        foregroundColor: GoldCraftColors.textSecondary,
-                        side: const BorderSide(color: GoldCraftColors.border),
+                        shape: const StadiumBorder(),
+                        foregroundColor: GcUi.muted,
+                        side: const BorderSide(color: GcUi.border),
                       ),
                       child: const Text('Cancel'),
                     ),
@@ -566,6 +855,7 @@ class _AdjustTreasurySheetState extends ConsumerState<_AdjustTreasurySheet> {
                       onPressed: _saving ? null : _submit,
                       style: ElevatedButton.styleFrom(
                         minimumSize: const Size(0, 52),
+                        shape: const StadiumBorder(),
                         backgroundColor: _accent,
                         foregroundColor: Colors.white,
                       ),
@@ -606,34 +896,30 @@ class _TxTile extends StatelessWidget {
     final isDebit = amountMg < 0;
     final date = DateTime.parse(tx['createdAt'] as String).toLocal();
     final note = (tx['note'] as String?)?.trim() ?? '';
+    final tone =
+        isDebit ? GoldCraftColors.softAmberText : GoldCraftColors.softGreenText;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: GoldCraftColors.pureWhite,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: GoldCraftColors.divider),
-      ),
+      decoration: GcUi.card(radius: 18),
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
               color: isDebit
                   ? GoldCraftColors.softAmber
                   : GoldCraftColors.softGreen,
-              borderRadius: BorderRadius.circular(10),
+              shape: BoxShape.circle,
             ),
             child: Icon(
               isDebit
                   ? Icons.arrow_upward_rounded
                   : Icons.arrow_downward_rounded,
-              color: isDebit
-                  ? GoldCraftColors.softAmberText
-                  : GoldCraftColors.softGreenText,
-              size: 20,
+              color: tone,
+              size: 22,
             ),
           ),
           const SizedBox(width: 12),
@@ -643,21 +929,17 @@ class _TxTile extends StatelessWidget {
               children: [
                 Text(tx['description'] as String? ?? type,
                     style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: GoldCraftColors.charcoal)),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: GcUi.ink)),
                 Text(DateFormat('d MMM, HH:mm').format(date),
-                    style: const TextStyle(
-                        fontSize: 11, color: GoldCraftColors.textHint)),
+                    style: const TextStyle(fontSize: 12, color: GcUi.muted)),
                 if (note.isNotEmpty)
                   Text(
                     note,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: GoldCraftColors.textSecondary,
-                    ),
+                    style: const TextStyle(fontSize: 12, color: GcUi.muted),
                   ),
               ],
             ),
@@ -668,16 +950,11 @@ class _TxTile extends StatelessWidget {
               Text(
                 '${isDebit ? '-' : '+'}${(amountMg.abs() / 1000).toStringAsFixed(3)} g',
                 style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: isDebit
-                        ? GoldCraftColors.softAmberText
-                        : GoldCraftColors.softGreenText),
+                    fontSize: 15, fontWeight: FontWeight.w800, color: tone),
               ),
               Text(
                 'Bal: ${(balanceMg / 1000).toStringAsFixed(3)} g',
-                style: const TextStyle(
-                    fontSize: 11, color: GoldCraftColors.textHint),
+                style: const TextStyle(fontSize: 12, color: GcUi.muted),
               ),
             ],
           ),

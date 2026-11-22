@@ -4,8 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../karagars/data/karagars_provider.dart';
 import '../../../../core/network/dio_client.dart';
-import '../../../../core/theme/colors.dart';
 import '../../../../shared/widgets/gc_states.dart';
+import '../../../../shared/widgets/gc_ui.dart';
 import 'users_screen.dart';
 
 class CreateUserScreen extends ConsumerStatefulWidget {
@@ -36,12 +36,12 @@ class _CreateUserScreenState extends ConsumerState<CreateUserScreen> {
     super.dispose();
   }
 
+  String get _roleTitle => '${_role[0].toUpperCase()}${_role.substring(1)}';
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_role == 'karagar' && _linkedKaragarId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please link a Karagar profile')),
-      );
+      gcSnack(context, 'Please link a Karagar profile', error: true);
       return;
     }
     setState(() => _isSubmitting = true);
@@ -52,25 +52,18 @@ class _CreateUserScreenState extends ConsumerState<CreateUserScreen> {
         'username': _usernameCtrl.text.trim().toLowerCase(),
         'password': _passwordCtrl.text,
         'role': _role,
-        if (_codeCtrl.text.trim().isNotEmpty) 'employeeCode': _codeCtrl.text.trim(),
+        if (_codeCtrl.text.trim().isNotEmpty)
+          'employeeCode': _codeCtrl.text.trim(),
         if (_role == 'karagar' && _linkedKaragarId != null)
           'karagarId': _linkedKaragarId,
       });
       if (!mounted) return;
       ref.invalidate(usersProvider);
+      gcSnack(context, '$_roleTitle account created');
       context.pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              '${_role[0].toUpperCase()}${_role.substring(1)} account created'),
-        ),
-      );
     } on DioException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(mapDioError(e).message),
-        backgroundColor: GoldCraftColors.softRedText,
-      ));
+      gcSnack(context, mapDioError(e).message, error: true);
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -80,24 +73,27 @@ class _CreateUserScreenState extends ConsumerState<CreateUserScreen> {
   Widget build(BuildContext context) {
     final karagarsAsync = ref.watch(karagarsProvider);
 
-    return Scaffold(
-      backgroundColor: GoldCraftColors.background,
-      appBar: AppBar(title: const Text('Create User')),
+    return GcScaffold(
+      isAdmin: true,
+      header: const GcPageHeader(
+        title: 'Create User',
+        subtitle: 'Add a manager or karagar login',
+        showBell: false,
+      ),
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
-            // Role selector card
-            _sectionLabel('Role'),
+            const GcSectionLabel('Role'),
             Row(children: [
               _RoleCard(
                 label: 'Manager',
                 icon: Icons.manage_accounts_outlined,
                 description: 'Full workshop access',
                 selected: _role == 'manager',
-                color: GoldCraftColors.softAmberText,
-                bg: GoldCraftColors.softAmber,
+                color: GcUi.goldDark,
+                bg: GcUi.goldTint,
                 onTap: () => setState(() {
                   _role = 'manager';
                   _linkedKaragarId = null;
@@ -109,15 +105,14 @@ class _CreateUserScreenState extends ConsumerState<CreateUserScreen> {
                 icon: Icons.handyman_outlined,
                 description: 'View own jobs & gold',
                 selected: _role == 'karagar',
-                color: GoldCraftColors.softBlueText,
-                bg: GoldCraftColors.softBlue,
+                color: GcUi.blue,
+                bg: GcUi.blueTint,
                 onTap: () => setState(() => _role = 'karagar'),
               ),
             ]),
             const SizedBox(height: 24),
 
-            // Basic info
-            _sectionLabel('Account Details'),
+            const GcSectionLabel('Account Details'),
             _field(_nameCtrl, 'Full Name',
                 icon: Icons.person_outline_rounded,
                 hint: 'e.g. Ramesh Sharma'),
@@ -138,35 +133,32 @@ class _CreateUserScreenState extends ConsumerState<CreateUserScreen> {
             // Karagar link — only shown when role = karagar
             if (_role == 'karagar') ...[
               const SizedBox(height: 8),
-              _sectionLabel('Link to Karagar Profile'),
+              const GcSectionLabel('Link to Karagar Profile'),
               karagarsAsync.when(
                 loading: () => const GcLoadingIndicator(),
                 error: (e, _) => GcErrorState(message: e.toString()),
                 data: (karagars) {
-                  final unlinked = karagars.where((k) => k.isActive).toList();
-                  if (unlinked.isEmpty) {
-                    return Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: GoldCraftColors.softAmber,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Text(
-                        'No active karagars found. Add a karagar first.',
-                        style: TextStyle(color: GoldCraftColors.softAmberText),
-                      ),
+                  final active = karagars.where((k) => k.isActive).toList();
+                  if (active.isEmpty) {
+                    return const GcBanner(
+                      icon: Icons.warning_amber_rounded,
+                      text: 'No active karagars found. Add a karagar first.',
+                      fg: GcUi.goldDark,
+                      bg: GcUi.goldTint,
                     );
                   }
                   return DropdownButtonFormField<String>(
                     value: _linkedKaragarId,
-                    decoration: const InputDecoration(
-                      hintText: 'Select karagar profile',
-                      prefixIcon: Icon(Icons.link_rounded),
-                    ),
-                    items: unlinked
+                    isExpanded: true,
+                    borderRadius: BorderRadius.circular(16),
+                    decoration: GcUi.input(
+                        hint: 'Select karagar profile',
+                        icon: Icons.link_rounded),
+                    items: active
                         .map((k) => DropdownMenuItem(
                               value: k.id,
-                              child: Text('${k.name} (${k.employeeCode})'),
+                              child: Text('${k.name} (${k.employeeCode})',
+                                  overflow: TextOverflow.ellipsis),
                             ))
                         .toList(),
                     onChanged: (v) => setState(() => _linkedKaragarId = v),
@@ -176,58 +168,26 @@ class _CreateUserScreenState extends ConsumerState<CreateUserScreen> {
                   );
                 },
               ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: GoldCraftColors.softBlue,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Row(children: [
-                  Icon(Icons.info_outline_rounded,
-                      size: 16, color: GoldCraftColors.softBlueText),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Linking lets the karagar see their own jobs and gold in the app.',
-                      style: TextStyle(
-                          fontSize: 12, color: GoldCraftColors.softBlueText),
-                    ),
-                  ),
-                ]),
+              const SizedBox(height: 12),
+              const GcBanner(
+                icon: Icons.info_outline_rounded,
+                text:
+                    'Linking lets the karagar see their own jobs and gold in the app.',
               ),
             ],
 
             const SizedBox(height: 32),
-            SizedBox(
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _isSubmitting ? null : _submit,
-                child: _isSubmitting
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2.5))
-                    : Text(
-                        'Create ${_role[0].toUpperCase()}${_role.substring(1)}'),
-              ),
+            GcPrimaryButton(
+              label: 'Create $_roleTitle',
+              icon: Icons.person_add_alt_1_rounded,
+              loading: _isSubmitting,
+              onPressed: _submit,
             ),
-            const SizedBox(height: 20),
           ],
         ),
       ),
     );
   }
-
-  Widget _sectionLabel(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Text(text,
-            style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: GoldCraftColors.textSecondary)),
-      );
 
   Widget _field(
     TextEditingController ctrl,
@@ -238,34 +198,31 @@ class _CreateUserScreenState extends ConsumerState<CreateUserScreen> {
     String? Function(String?)? validator,
   }) =>
       Padding(
-        padding: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.only(bottom: 14),
         child: TextFormField(
           controller: ctrl,
-          decoration: InputDecoration(
-            labelText: label,
-            hintText: hint,
-            prefixIcon: icon != null ? Icon(icon) : null,
-          ),
+          decoration: GcUi.input(label: label, hint: hint, icon: icon),
           validator: validator ??
               (required
-                  ? (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Required' : null
+                  ? (v) => (v == null || v.trim().isEmpty) ? 'Required' : null
                   : null),
         ),
       );
 
   Widget _passwordField() => Padding(
-        padding: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.only(bottom: 14),
         child: TextFormField(
           controller: _passwordCtrl,
           obscureText: _obscure,
-          decoration: InputDecoration(
-            labelText: 'Password',
-            prefixIcon: const Icon(Icons.lock_outline_rounded),
-            suffixIcon: IconButton(
-              icon: Icon(_obscure
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined),
+          decoration: GcUi.input(
+            label: 'Password',
+            icon: Icons.lock_outline_rounded,
+            suffix: IconButton(
+              icon: Icon(
+                  _obscure
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: GcUi.muted),
               onPressed: () => setState(() => _obscure = !_obscure),
             ),
           ),
@@ -308,28 +265,30 @@ class _RoleCard extends StatelessWidget {
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: selected ? bg : GoldCraftColors.pureWhite,
-            borderRadius: BorderRadius.circular(14),
+            color: selected ? bg : Colors.white,
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: selected ? color : GoldCraftColors.divider,
+              color: selected ? color : GcUi.border,
               width: selected ? 2 : 1,
             ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: selected ? color : GoldCraftColors.textHint, size: 28),
+              Icon(icon, color: selected ? color : GcUi.hint, size: 28),
               const SizedBox(height: 10),
               Text(label,
                   style: TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: selected ? color : GoldCraftColors.charcoal)),
+                      fontWeight: FontWeight.w800,
+                      color: selected ? color : GcUi.ink)),
               const SizedBox(height: 4),
               Text(description,
                   style: TextStyle(
-                      fontSize: 11,
-                      color: selected ? color.withOpacity(0.7) : GoldCraftColors.textHint)),
+                      fontSize: 11.5,
+                      color: selected
+                          ? color.withValues(alpha: 0.75)
+                          : GcUi.muted)),
             ],
           ),
         ),

@@ -6,6 +6,10 @@
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>Inter C</string>
+	<key>NSCameraUsageDescription</key>
+	<string>GoldCraft uses the camera to capture scale evidence and Karagar profile pictures.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>GoldCraft uses your photo library to select a Karagar profile picture.</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

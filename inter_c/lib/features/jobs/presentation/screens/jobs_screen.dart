@@ -4,9 +4,11 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../data/jobs_provider.dart';
 import '../../domain/job_model.dart';
+import '../../../auth/domain/auth_provider.dart';
 import '../../../../core/theme/colors.dart';
 import '../../../../shared/widgets/gc_states.dart';
 import '../../../../shared/widgets/gc_badge.dart';
+import '../../../../shared/widgets/gc_ui.dart';
 
 class JobsScreen extends ConsumerStatefulWidget {
   const JobsScreen({super.key});
@@ -29,29 +31,32 @@ class _JobsScreenState extends ConsumerState<JobsScreen> {
   @override
   Widget build(BuildContext context) {
     final jobsAsync = ref.watch(allJobsProvider(_statusFilter));
+    // Used only to show the counts on the filter pills.
+    final allJobs = ref.watch(allJobsProvider(null)).valueOrNull;
+    final isAdmin = ref.watch(authUserProvider).valueOrNull?.isAdmin == true;
 
-    return Scaffold(
-      backgroundColor: GoldCraftColors.background,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          tooltip: 'Back to dashboard',
-          onPressed: () => context.go('/dashboard'),
-        ),
-        title: const Text('Jobs'),
+    return GcScaffold(
+      isAdmin: isAdmin,
+      bottomNav: GcBottomNav(currentIndex: 2, isAdmin: isAdmin),
+      header: GcPageHeader(
+        title: 'Jobs',
+        onBack: () => context.go('/dashboard'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add_rounded),
+          GcCircleButton(
+            icon: Icons.add_rounded,
+            tooltip: 'New job',
+            color: GcUi.primary(isAdmin),
             onPressed: () => context.push('/jobs/new'),
           ),
         ],
       ),
       body: Column(
         children: [
-          _buildFilterBar(),
+          _buildFilterBar(allJobs, isAdmin),
           Expanded(
             child: jobsAsync.when(
-              loading: () => const GcLoadingIndicator(message: 'Loading jobs...'),
+              loading: () =>
+                  const GcLoadingIndicator(message: 'Loading jobs...'),
               error: (e, _) => GcErrorState(
                 message: e.toString(),
                 onRetry: () => ref.invalidate(allJobsProvider(_statusFilter)),
@@ -65,14 +70,14 @@ class _JobsScreenState extends ConsumerState<JobsScreen> {
                   );
                 }
                 return RefreshIndicator(
-                  color: GoldCraftColors.jewelryGold,
+                  color: GcUi.accent(isAdmin),
                   onRefresh: () async =>
                       ref.invalidate(allJobsProvider(_statusFilter)),
                   child: ListView.separated(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                     itemCount: jobs.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
                     itemBuilder: (_, i) => _JobListTile(job: jobs[i]),
                   ),
                 );
@@ -84,11 +89,19 @@ class _JobsScreenState extends ConsumerState<JobsScreen> {
     );
   }
 
-  Widget _buildFilterBar() {
+  String _label(String base, String? key, List<Job>? all) {
+    if (all == null) return base;
+    final n = key == null
+        ? all.length
+        : all.where((j) => j.status.name == key).length;
+    return '$base ($n)';
+  }
+
+  Widget _buildFilterBar(List<Job>? all, bool isAdmin) {
     return Container(
-      width: double.infinity,
-      color: GoldCraftColors.pureWhite,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      padding: const EdgeInsets.all(6),
+      decoration: GcUi.card(radius: 30, color: GcUi.ivory),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
@@ -96,8 +109,9 @@ class _JobsScreenState extends ConsumerState<JobsScreen> {
               .map((s) => Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: _StatusPill(
-                      label: s.$2,
+                      label: _label(s.$2, s.$1, all),
                       selected: _statusFilter == s.$1,
+                      primary: GcUi.primary(isAdmin),
                       onTap: () => setState(() => _statusFilter = s.$1),
                     ),
                   ))
@@ -109,51 +123,48 @@ class _JobsScreenState extends ConsumerState<JobsScreen> {
 }
 
 // -----------------------------------------------------------------------------
-// Filter pill with explicit colors.
-//
-// FilterChip takes its label colour from the app-wide chipTheme, which can
-// differ between web and a release APK. Here every colour is set directly, so
-// the text is always visible.
+// Filter pill (all colours set explicitly so text is always visible)
 // -----------------------------------------------------------------------------
 class _StatusPill extends StatelessWidget {
   final String label;
   final bool selected;
+  final Color primary;
   final VoidCallback onTap;
 
   const _StatusPill({
     required this.label,
     required this.selected,
+    required this.primary,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final Color bg =
-        selected ? GoldCraftColors.jewelryGoldLight : GoldCraftColors.warmIvory;
-    final Color border =
-        selected ? GoldCraftColors.jewelryGold : GoldCraftColors.border;
-    final Color textColor =
-        selected ? GoldCraftColors.jewelryGoldDark : GoldCraftColors.charcoal;
+    final Color bg = selected ? primary : Colors.white;
+    final Color border = selected ? primary : GcUi.border;
+    final Color textColor = selected ? Colors.white : GcUi.ink;
 
     return Material(
       color: bg,
+      elevation: selected ? 2 : 0,
+      shadowColor: Colors.black26,
       shape: StadiumBorder(side: BorderSide(color: border, width: 1.2)),
       child: InkWell(
         customBorder: const StadiumBorder(),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (selected) ...[
-                Icon(Icons.check_rounded, size: 16, color: textColor),
+                Icon(Icons.check_rounded, size: 18, color: textColor),
                 const SizedBox(width: 6),
               ],
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 14,
                   height: 1.2,
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
                   color: textColor,
@@ -167,6 +178,9 @@ class _StatusPill extends StatelessWidget {
   }
 }
 
+// -----------------------------------------------------------------------------
+// Job card with a coloured accent strip (gold, or red-orange when overdue)
+// -----------------------------------------------------------------------------
 class _JobListTile extends StatelessWidget {
   final Job job;
   const _JobListTile({required this.job});
@@ -176,67 +190,98 @@ class _JobListTile extends StatelessWidget {
     final isOverdue = job.dueDate.isBefore(DateTime.now()) &&
         job.status != JobStatus.completed &&
         job.status != JobStatus.cancelled;
+    final accent = isOverdue ? const Color(0xFFE2571F) : GcUi.gold;
+    final dueColor = isOverdue ? GoldCraftColors.softRedText : GcUi.muted;
 
     return GestureDetector(
       onTap: () => context.push('/jobs/${job.id}'),
       child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: GoldCraftColors.pureWhite,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: GoldCraftColors.divider),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: GoldCraftColors.jewelryGoldLight,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.diamond_outlined,
-                  color: GoldCraftColors.jewelryGoldDark, size: 24),
+        decoration: GcUi.card(radius: 20),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(width: 5, color: accent),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: GcUi.goldTint,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Icon(Icons.diamond_outlined,
+                              color: GcUi.goldDark, size: 30),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(job.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w800,
+                                            color: GcUi.ink)),
+                                  ),
+                                  _statusBadge(job.status),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  const Icon(Icons.person_outline_rounded,
+                                      size: 17, color: GcUi.muted),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      '${job.karagarName} · #${job.jobNumber}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          fontSize: 13, color: GcUi.muted),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Icon(Icons.calendar_month_outlined,
+                                      size: 17, color: dueColor),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Due ${DateFormat('d MMM').format(job.dueDate)}',
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: dueColor),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right_rounded,
+                            color: GcUi.ink, size: 26),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(job.title,
-                            style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: GoldCraftColors.charcoal)),
-                      ),
-                      _statusBadge(job.status),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${job.karagarName} · #${job.jobNumber}',
-                    style: const TextStyle(
-                        fontSize: 12, color: GoldCraftColors.textSecondary),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Due ${DateFormat('d MMM').format(job.dueDate)}',
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: isOverdue
-                            ? GoldCraftColors.softRedText
-                            : GoldCraftColors.textHint),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right_rounded,
-                color: GoldCraftColors.textHint),
-          ],
+          ),
         ),
       ),
     );

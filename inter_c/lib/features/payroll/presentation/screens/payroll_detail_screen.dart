@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../data/payroll_provider.dart';
 import '../../../../shared/widgets/gc_badge.dart';
 import '../../../../shared/widgets/gc_states.dart';
+import '../../../../shared/widgets/gc_ui.dart';
 import '../../../../core/theme/colors.dart';
 
 class PayrollDetailScreen extends ConsumerWidget {
@@ -14,9 +16,12 @@ class PayrollDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final payrollAsync = ref.watch(payrollDetailProvider(payrollId));
 
-    return Scaffold(
-      backgroundColor: GoldCraftColors.background,
-      appBar: AppBar(title: const Text('Payroll Detail')),
+    return GcScaffold(
+      isAdmin: false,
+      header: GcPageHeader(
+        title: 'Payroll Detail',
+        showBack: context.canPop(),
+      ),
       body: payrollAsync.when(
         loading: () => const GcLoadingIndicator(message: 'Loading payroll...'),
         error: (e, _) => GcErrorState(message: e.toString()),
@@ -32,37 +37,129 @@ class PayrollDetailScreen extends ConsumerWidget {
           };
 
           return ListView(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             children: [
+              // ── Hero card ──────────────────────────────────────────────
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: GoldCraftColors.pureWhite,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: GoldCraftColors.divider),
+                  borderRadius: BorderRadius.circular(28),
+                  gradient: LinearGradient(
+                    colors: GcUi.heroGradient(false),
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: GcUi.greenDark.withValues(alpha: 0.25),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(children: [
-                      Expanded(
-                        child: Text(payroll.karagarName,
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withValues(alpha: 0.1),
+                          border: Border.all(color: GcUi.gold, width: 1.5),
+                        ),
+                        child: Center(
+                          child: Text(
+                            payroll.karagarName.isNotEmpty
+                                ? payroll.karagarName[0].toUpperCase()
+                                : '?',
                             style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: GoldCraftColors.charcoal)),
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: GcUi.gold),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(payroll.karagarName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white)),
+                            const SizedBox(height: 2),
+                            Row(children: [
+                              const Icon(Icons.calendar_month_outlined,
+                                  size: 14, color: Colors.white70),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  '${fmt.format(payroll.periodStart)} \u2013 ${fmt.format(payroll.periodEnd)}',
+                                  style: const TextStyle(
+                                      fontSize: 13, color: Colors.white70),
+                                ),
+                              ),
+                            ]),
+                          ],
+                        ),
                       ),
                       GoldCraftBadge(label: badgeLabel, type: badgeType),
                     ]),
-                    const SizedBox(height: 6),
-                    Text(
-                      '${fmt.format(payroll.periodStart)} \u2013 ${fmt.format(payroll.periodEnd)}',
-                      style: const TextStyle(
-                          fontSize: 13, color: GoldCraftColors.textSecondary),
+                    const SizedBox(height: 18),
+                    const Text('Net Payable',
+                        style: TextStyle(fontSize: 14, color: Colors.white70)),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '\u20b9${payroll.netPayableRupees.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                            fontSize: 38,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white),
+                      ),
                     ),
-                    const SizedBox(height: 16),
-                    const Divider(),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
+                    Row(children: [
+                      Expanded(
+                        child: _heroStat('Paid',
+                            '\u20b9${payroll.paidRupees.toStringAsFixed(0)}',
+                            const Color(0xFF86EFAC)),
+                      ),
+                      Container(
+                          width: 1,
+                          height: 36,
+                          color: Colors.white.withValues(alpha: 0.3)),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: _heroStat(
+                          'Remaining',
+                          '\u20b9${payroll.remainingRupees.toStringAsFixed(0)}',
+                          payroll.remainingRupees > 0
+                              ? GcUi.gold
+                              : Colors.white,
+                        ),
+                      ),
+                    ]),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // ── Breakdown ──────────────────────────────────────────────
+              _sectionTitle(Icons.receipt_long_outlined, 'Breakdown'),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: GcUi.card(radius: 22),
+                child: Column(
+                  children: [
                     _row('Jobs Done', '${payroll.jobsDone}'),
                     _row('Gross Labor',
                         '\u20b9${payroll.grossLaborRupees.toStringAsFixed(0)}'),
@@ -75,37 +172,23 @@ class PayrollDetailScreen extends ConsumerWidget {
                     _row('Advance Deduction',
                         '- \u20b9${payroll.advanceDeductionRupees.toStringAsFixed(0)}',
                         color: GoldCraftColors.softAmberText),
-                    const Divider(height: 24),
+                    const Divider(height: 24, color: GcUi.border),
                     _row('Net Payable',
                         '\u20b9${payroll.netPayableRupees.toStringAsFixed(0)}',
                         bold: true),
-                    _row('Paid',
-                        '\u20b9${payroll.paidRupees.toStringAsFixed(0)}',
-                        color: GoldCraftColors.softGreenText),
-                    if (payroll.remainingRupees > 0)
-                      _row('Remaining',
-                          '\u20b9${payroll.remainingRupees.toStringAsFixed(0)}',
-                          color: GoldCraftColors.softRedText, bold: true),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
+
+              // ── Wastage ────────────────────────────────────────────────
+              _sectionTitle(Icons.scale_outlined, 'Wastage'),
+              const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: GoldCraftColors.pureWhite,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: GoldCraftColors.divider),
-                ),
+                padding: const EdgeInsets.all(18),
+                decoration: GcUi.card(radius: 22),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Wastage',
-                        style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: GoldCraftColors.charcoal)),
-                    const SizedBox(height: 12),
                     _row('Allowed',
                         '${payroll.allowedWastageGrams.toStringAsFixed(2)} g'),
                     _row('Actual',
@@ -118,6 +201,7 @@ class PayrollDetailScreen extends ConsumerWidget {
                       color: payroll.wastageStatus == 'withinAllowance'
                           ? GoldCraftColors.softGreenText
                           : GoldCraftColors.softRedText,
+                      bold: true,
                     ),
                   ],
                 ),
@@ -136,22 +220,58 @@ class PayrollDetailScreen extends ConsumerWidget {
     );
   }
 
+  Widget _heroStat(String label, String value, Color valueColor) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: const TextStyle(fontSize: 12, color: Colors.white70)),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(value,
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: valueColor)),
+          ),
+        ],
+      );
+
+  Widget _sectionTitle(IconData icon, String title) => Row(
+        children: [
+          Icon(icon, color: GcUi.greenDark, size: 24),
+          const SizedBox(width: 8),
+          Text(title,
+              style: const TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.w800, color: GcUi.ink)),
+        ],
+      );
+
   Widget _row(String label, String value, {Color? color, bool bold = false}) =>
       Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
+        padding: const EdgeInsets.symmetric(vertical: 6),
         child: Row(children: [
           Text(label,
-              style: const TextStyle(
-                  fontSize: 13, color: GoldCraftColors.textSecondary)),
+              style: const TextStyle(fontSize: 14, color: GcUi.muted)),
           const Spacer(),
           Text(value,
               style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
-                  color: color ?? GoldCraftColors.charcoal)),
+                  fontSize: 14,
+                  fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
+                  color: color ?? GcUi.ink)),
         ]),
       );
 }
+
+ButtonStyle _primaryButtonStyle() => ElevatedButton.styleFrom(
+      backgroundColor: GcUi.greenDark,
+      foregroundColor: Colors.white,
+      shape: const StadiumBorder(),
+      elevation: 3,
+      shadowColor: Colors.black26,
+      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+    );
 
 class _ApproveButton extends ConsumerStatefulWidget {
   final String payrollId;
@@ -169,6 +289,7 @@ class _ApproveButtonState extends ConsumerState<_ApproveButton> {
     return SizedBox(
       height: 56,
       child: ElevatedButton.icon(
+        style: _primaryButtonStyle(),
         onPressed: _loading
             ? null
             : () async {
@@ -218,6 +339,7 @@ class _RecordPaymentButtonState extends ConsumerState<_RecordPaymentButton> {
     return SizedBox(
       height: 56,
       child: ElevatedButton.icon(
+        style: _primaryButtonStyle(),
         onPressed: _loading
             ? null
             : () async {
@@ -227,7 +349,12 @@ class _RecordPaymentButtonState extends ConsumerState<_RecordPaymentButton> {
                 final confirmed = await showDialog<bool>(
                   context: context,
                   builder: (_) => AlertDialog(
-                    title: const Text('Record Payment'),
+                    backgroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24)),
+                    title: const Text('Record Payment',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800, color: GcUi.ink)),
                     content: TextField(
                       controller: ctrl,
                       keyboardType: TextInputType.number,
@@ -239,6 +366,11 @@ class _RecordPaymentButtonState extends ConsumerState<_RecordPaymentButton> {
                           onPressed: () => Navigator.pop(context, false),
                           child: const Text('Cancel')),
                       ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: GcUi.greenDark,
+                            foregroundColor: Colors.white,
+                            shape: const StadiumBorder(),
+                          ),
                           onPressed: () => Navigator.pop(context, true),
                           child: const Text('Record')),
                     ],

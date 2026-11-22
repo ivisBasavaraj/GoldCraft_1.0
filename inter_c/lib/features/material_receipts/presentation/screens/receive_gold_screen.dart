@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../../jobs/data/jobs_provider.dart';
 import '../../../jobs/domain/job_model.dart';
 import '../../data/receipts_provider.dart';
-import '../../../../core/theme/colors.dart';
 import '../../../../shared/widgets/gc_states.dart';
+import '../../../../shared/widgets/gc_ui.dart';
 import '../../../../features/auth/domain/auth_provider.dart';
 
 class ReceiveGoldScreen extends ConsumerStatefulWidget {
@@ -21,20 +21,21 @@ class _ReceiveGoldScreenState extends ConsumerState<ReceiveGoldScreen> {
   final _weightCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
   String? _selectedJobId;
-  String _receiptType = 'finishedProduct';
+  // Was 'finishedProduct', which matched none of the chips below.
+  String _receiptType = 'finished';
   bool _isSubmitting = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedJobId = widget.initialJobId;
-  }
 
   static const _receiptTypes = [
     ('finished', 'Finished Product'),
     ('scrap', 'Scrap / Partial Return'),
     ('wastage', 'Wastage'),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedJobId = widget.initialJobId;
+  }
 
   @override
   void dispose() {
@@ -46,8 +47,7 @@ class _ReceiveGoldScreenState extends ConsumerState<ReceiveGoldScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedJobId == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Please select a job')));
+      gcSnack(context, 'Please select a job', error: true);
       return;
     }
     setState(() => _isSubmitting = true);
@@ -61,14 +61,11 @@ class _ReceiveGoldScreenState extends ConsumerState<ReceiveGoldScreen> {
         notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
       );
       if (!mounted) return;
+      gcSnack(context, 'Receipt recorded successfully');
       context.pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Receipt recorded successfully')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: GoldCraftColors.softRedText));
+      gcSnack(context, e.toString(), error: true);
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -82,15 +79,19 @@ class _ReceiveGoldScreenState extends ConsumerState<ReceiveGoldScreen> {
         ? ref.watch(myJobsProvider)
         : ref.watch(allJobsProvider(null));
 
-    return Scaffold(
-      backgroundColor: GoldCraftColors.background,
-      appBar: AppBar(title: const Text('Receive Gold')),
+    return GcScaffold(
+      isAdmin: false,
+      header: const GcPageHeader(
+        title: 'Receive Gold',
+        subtitle: 'Record gold returned from a job',
+        showBell: false,
+      ),
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
-            _label('Select Job'),
+            const GcSectionLabel('Select Job'),
             jobsAsync.when(
               loading: () => const GcLoadingIndicator(),
               error: (e, _) => GcErrorState(message: e.toString()),
@@ -100,11 +101,16 @@ class _ReceiveGoldScreenState extends ConsumerState<ReceiveGoldScreen> {
                         j.status == JobStatus.inProgress ||
                         j.status == JobStatus.qualityCheck)
                     .toList();
+                // Guard: dropdown asserts if the selected id isn't listed
+                final current = active.any((j) => j.id == _selectedJobId)
+                    ? _selectedJobId
+                    : null;
                 return DropdownButtonFormField<String>(
-                  value: _selectedJobId,
-                  decoration: const InputDecoration(
-                      hintText: 'Select job',
-                      prefixIcon: Icon(Icons.work_outline_rounded)),
+                  value: current,
+                  isExpanded: true,
+                  borderRadius: BorderRadius.circular(16),
+                  decoration: GcUi.input(
+                      hint: 'Select job', icon: Icons.work_outline_rounded),
                   items: active
                       .map((j) => DropdownMenuItem(
                             value: j.id,
@@ -117,70 +123,55 @@ class _ReceiveGoldScreenState extends ConsumerState<ReceiveGoldScreen> {
               },
             ),
             const SizedBox(height: 20),
-            _label('Receipt Type'),
+            const GcSectionLabel('Receipt Type'),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: _receiptTypes
-                  .map((t) => ChoiceChip(
-                        label: Text(t.$2),
+                  .map((t) => GcChoiceChip(
+                        label: t.$2,
                         selected: _receiptType == t.$1,
-                        onSelected: (_) =>
-                            setState(() => _receiptType = t.$1),
-                        selectedColor: GoldCraftColors.jewelryGoldLight,
+                        onTap: () => setState(() => _receiptType = t.$1),
                       ))
                   .toList(),
             ),
             const SizedBox(height: 20),
-            _label('Physical Weight (grams)'),
+            const GcSectionLabel('Physical Weight (grams)'),
             TextFormField(
               controller: _weightCtrl,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                hintText: 'e.g. 118.200',
-                suffixText: 'g',
-                prefixIcon: Icon(Icons.scale_outlined),
-              ),
+              style: const TextStyle(
+                  fontSize: 20, fontWeight: FontWeight.w800, color: GcUi.ink),
+              decoration: GcUi.input(
+                hint: 'e.g. 118.200',
+                icon: Icons.scale_outlined,
+              ).copyWith(suffixText: 'g'),
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return 'Required';
-                if (double.tryParse(v.trim()) == null) return 'Invalid number';
+                final n = double.tryParse(v.trim());
+                if (n == null) return 'Invalid number';
+                if (n < 0) return 'Cannot be negative';
                 return null;
               },
             ),
             const SizedBox(height: 20),
-            _label('Notes (optional)'),
+            const GcSectionLabel('Notes (optional)'),
             TextFormField(
               controller: _notesCtrl,
               maxLines: 3,
-              decoration: const InputDecoration(hintText: 'Any remarks...'),
+              decoration: GcUi.input(hint: 'Any remarks...'),
             ),
             const SizedBox(height: 32),
-            SizedBox(
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _isSubmitting ? null : _submit,
-                child: _isSubmitting
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2.5))
-                    : const Text('Record Receipt'),
-              ),
+            GcPrimaryButton(
+              label: 'Record Receipt',
+              icon: Icons.arrow_downward_rounded,
+              loading: _isSubmitting,
+              onPressed: _submit,
             ),
           ],
         ),
       ),
     );
   }
-
-  Widget _label(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Text(text,
-            style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: GoldCraftColors.textSecondary)),
-      );
 }
