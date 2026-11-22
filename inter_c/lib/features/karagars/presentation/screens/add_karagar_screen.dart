@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../data/karagars_provider.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../shared/widgets/gc_ui.dart';
+import '../utils/karagar_profile_picture.dart';
 
 class AddKaragarScreen extends ConsumerStatefulWidget {
   const AddKaragarScreen({super.key});
@@ -23,7 +24,7 @@ class _AddKaragarScreenState extends ConsumerState<AddKaragarScreen> {
   final _specCtrl = TextEditingController();
   final _imagePicker = ImagePicker();
   String _meltingGroup = 'Group A';
-  XFile? _profilePicture;
+  String? _profilePictureFilename;
   Uint8List? _profilePictureBytes;
   String? _profilePictureError;
   bool _isSubmitting = false;
@@ -39,12 +40,14 @@ class _AddKaragarScreenState extends ConsumerState<AddKaragarScreen> {
 
   Future<void> _submit() async {
     final formIsValid = _formKey.currentState!.validate();
-    final profilePicture = _profilePicture;
     final profilePictureBytes = _profilePictureBytes;
-    if (profilePicture == null || profilePictureBytes == null) {
+    final profilePictureFilename = _profilePictureFilename;
+    if (profilePictureFilename == null || profilePictureBytes == null) {
       setState(() => _profilePictureError = 'A profile picture is required');
     }
-    if (!formIsValid || profilePicture == null || profilePictureBytes == null) {
+    if (!formIsValid ||
+        profilePictureFilename == null ||
+        profilePictureBytes == null) {
       return;
     }
 
@@ -59,7 +62,7 @@ class _AddKaragarScreenState extends ConsumerState<AddKaragarScreen> {
         if (_phoneCtrl.text.trim().isNotEmpty) 'phone': _phoneCtrl.text.trim(),
         'avatar': MultipartFile.fromBytes(
           profilePictureBytes,
-          filename: profilePicture.name,
+          filename: profilePictureFilename,
         ),
       }));
       if (!mounted) return;
@@ -100,9 +103,9 @@ class _AddKaragarScreenState extends ConsumerState<AddKaragarScreen> {
     try {
       final image = await _imagePicker.pickImage(
         source: source,
-        imageQuality: 85,
-        maxWidth: 1600,
-        maxHeight: 1600,
+        imageQuality: 75,
+        maxWidth: 1200,
+        maxHeight: 1200,
       );
       if (image == null || !mounted) return;
       final imageBytes = await image.readAsBytes();
@@ -111,9 +114,17 @@ class _AddKaragarScreenState extends ConsumerState<AddKaragarScreen> {
         setState(() => _profilePictureError = 'Selected photo is empty');
         return;
       }
+      final normalizedImage = normalizeKaragarProfilePicture(imageBytes);
+      if (normalizedImage == null) {
+        setState(() => _profilePictureError =
+            'Could not compress this photo. Please choose another image.');
+        return;
+      }
       setState(() {
-        _profilePicture = image;
-        _profilePictureBytes = imageBytes;
+        _profilePictureFilename = imageBytes.length > maxKaragarProfilePictureBytes
+            ? 'karagar-profile.jpg'
+            : image.name;
+        _profilePictureBytes = normalizedImage;
         _profilePictureError = null;
       });
     } on PlatformException catch (e) {
@@ -190,7 +201,7 @@ class _AddKaragarScreenState extends ConsumerState<AddKaragarScreen> {
               child: Row(
                 children: [
                   ClipOval(
-                    child: _profilePicture == null
+                    child: _profilePictureBytes == null
                         ? Container(
                             width: 72,
                             height: 72,
@@ -212,10 +223,10 @@ class _AddKaragarScreenState extends ConsumerState<AddKaragarScreen> {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: _isSubmitting ? null : _chooseProfilePicture,
-                      icon: Icon(_profilePicture == null
+                      icon: Icon(_profilePictureBytes == null
                           ? Icons.add_a_photo_outlined
                           : Icons.edit_outlined),
-                      label: Text(_profilePicture == null
+                      label: Text(_profilePictureBytes == null
                           ? 'Choose photo'
                           : 'Change photo'),
                     ),
